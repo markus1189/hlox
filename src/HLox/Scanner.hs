@@ -1,15 +1,17 @@
 module HLox.Scanner (scanTokens) where
 
 import Control.Lens (to, use, (%=), (.=))
-import Control.Lens.Operators ((+=), (|>=))
+import Control.Lens.Operators ((+=), (|>=), (<+~))
 import Control.Lens.TH (makeLenses)
 import Control.Monad.Loops (whileM_)
 import Control.Monad.State (State, evalState)
 import Control.Monad.State.Class (MonadState)
 import Data.Text (Text)
 import Data.Text qualified as Text
+import Data.Text.Read qualified as Text
 import Numeric.Natural (Natural)
 import Control.Monad (when, void)
+import Data.Char (isDigit)
 
 newtype Line = Line Natural
   deriving (Show, Eq, Ord, Num)
@@ -17,7 +19,7 @@ newtype Line = Line Natural
 newtype Lexeme = Lexeme Text
   deriving (Show, Eq, Ord)
 
-data Literal = LitNothing | LitText Text
+data Literal = LitNothing | LitText Text | LitNumber Double
   deriving (Show, Eq, Ord)
 
 data TokenType
@@ -127,6 +129,7 @@ scanToken = do
     '\t' -> pure ()
     '\n' -> ssLine += 1
     '"' -> scanString
+    (isDigit -> True) -> scanNumber
     _ -> do
       e <- ScanError <$> use ssLine <*> pure "Unexpected character."
       ssErrors |>= e
@@ -189,3 +192,22 @@ scanString = do
       void advance
       value <- slice <$> ((+1) <$> use ssStart) <*> (subtract 1 <$> use ssCurrent) <*> use ssSource
       addToken (LitText value) STRING
+
+scanNumber :: MonadState ScanState m => m ()
+scanNumber = do
+  whileM_ (isDigit <$> peek) advance
+  dotThenDigit <- ((&&) <$> (('.' ==) <$> peek) <*> (isDigit <$> peekNext))
+  when dotThenDigit $ do
+    void advance
+    whileM_ (isDigit <$> peek) advance
+
+  value <- slice <$> use ssStart <*> use ssCurrent <*> use ssSource
+  addToken (LitNumber $ unsafeFromRight $ Text.double value) NUMBER
+  where unsafeFromRight (Right (x, _)) = x
+
+peekNext :: MonadState ScanState m => m Char
+peekNext = do
+  isAtEnd <- (>=) <$> use (ssCurrent . to (+1)) <*> use (ssSource . to Text.length)
+  if isAtEnd
+    then pure '\0'
+    else Text.index <$> use ssSource <*> use (ssCurrent . to (+1))
