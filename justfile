@@ -8,4 +8,4 @@ test:
 
 accept:
     #!/usr/bin/env bash
-    cabal test --accept
+    cabal test --test-options=--accept
