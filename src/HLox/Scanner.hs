@@ -12,6 +12,9 @@ import Data.Text.Read qualified as Text
 import Numeric.Natural (Natural)
 import Control.Monad (when, void)
 import Data.Char (isDigit)
+import Data.Map (Map)
+import qualified Data.Map.Strict as Map
+import Data.Maybe (fromMaybe)
 
 newtype Line = Line Natural
   deriving (Show, Eq, Ord, Num)
@@ -90,6 +93,25 @@ data ScanState = ScanState
 
 makeLenses ''ScanState
 
+reservedKeywords :: Map Text TokenType
+reservedKeywords = Map.fromList [("and", AND)
+                                ,("class", CLASS)
+                                ,("else", ELSE)
+                                ,("false", FALSE)
+                                ,("for", FOR)
+                                ,("fun", FUN)
+                                ,("if", IF)
+                                ,("nil", NIL)
+                                ,("or", OR)
+                                ,("print", PRINT)
+                                ,("return", RETURN)
+                                ,("super", SUPER)
+                                ,("this", THIS)
+                                ,("true", TRUE)
+                                ,("var", VAR)
+                                ,("while", WHILE)
+                                ]
+
 scanTokens :: Text -> [Token]
 scanTokens script = flip evalState (ScanState 0 0 (Line 1) script [] []) $ do
   whileM_ (not <$> scannerIsAtEnd) $ do
@@ -130,12 +152,56 @@ scanToken = do
     '\n' -> ssLine += 1
     '"' -> scanString
     (isDigit -> True) -> scanNumber
+    (isAlpha -> True) -> scanIdentifier
     _ -> do
       e <- ScanError <$> use ssLine <*> pure "Unexpected character."
       ssErrors |>= e
   where
     addToken' = addToken LitNothing
     match' c t f = match c >>= \b -> if b then pure t else pure f
+
+scanString :: MonadState ScanState m => m ()
+scanString = do
+  let quote = (/= '"') <$> peek
+  whileM_ ((&&) <$> quote <*> (not <$> scannerIsAtEnd)) $ do
+    isNewline <- (== '\n') <$> peek
+    when isNewline $ ssLine += 1
+    advance
+  isAtEnd <- scannerIsAtEnd
+  if isAtEnd
+    then do
+      e <- ScanError <$> use ssLine <*> pure "Unterminated string."
+      ssErrors |>= e
+    else do
+      -- closing '"'
+      void advance
+      value <- slice <$> ((+1) <$> use ssStart) <*> (subtract 1 <$> use ssCurrent) <*> use ssSource
+      addToken (LitText value) STRING
+
+scanNumber :: MonadState ScanState m => m ()
+scanNumber = do
+  whileM_ (isDigit <$> peek) advance
+  dotThenDigit <- ((&&) <$> (('.' ==) <$> peek) <*> (isDigit <$> peekNext))
+  when dotThenDigit $ do
+    void advance
+    whileM_ (isDigit <$> peek) advance
+
+  value <- slice <$> use ssStart <*> use ssCurrent <*> use ssSource
+  addToken (LitNumber $ unsafeFromRight $ Text.double value) NUMBER
+  where unsafeFromRight (Right (x, _)) = x
+
+scanIdentifier ::MonadState ScanState m => m ()
+scanIdentifier = do
+  whileM_ (isAlphaNumeric <$> peek) advance
+  value <- slice <$> use ssStart <*> use ssCurrent <*> use ssSource
+  let t = fromMaybe IDENTIFIER $ Map.lookup value reservedKeywords
+  addToken LitNothing t
+
+isAlpha :: Char -> Bool
+isAlpha = flip elem $ ['a'..'z'] ++ ['A'..'Z'] ++ ['_']
+
+isAlphaNumeric :: Char -> Bool
+isAlphaNumeric = (||) <$> isAlpha <*> isDigit
 
 addToken :: (MonadState ScanState m) => Literal -> TokenType -> m ()
 addToken lit t = do
@@ -174,36 +240,6 @@ peek = do
   if isAtEnd
     then pure '\0'
     else Text.index <$> use ssSource <*> use ssCurrent
-
-scanString :: MonadState ScanState m => m ()
-scanString = do
-  let quote = (/= '"') <$> peek
-  whileM_ ((&&) <$> quote <*> (not <$> scannerIsAtEnd)) $ do
-    isNewline <- (== '\n') <$> peek
-    when isNewline $ ssLine += 1
-    advance
-  isAtEnd <- scannerIsAtEnd
-  if isAtEnd
-    then do
-      e <- ScanError <$> use ssLine <*> pure "Unterminated string."
-      ssErrors |>= e
-    else do
-      -- closing '"'
-      void advance
-      value <- slice <$> ((+1) <$> use ssStart) <*> (subtract 1 <$> use ssCurrent) <*> use ssSource
-      addToken (LitText value) STRING
-
-scanNumber :: MonadState ScanState m => m ()
-scanNumber = do
-  whileM_ (isDigit <$> peek) advance
-  dotThenDigit <- ((&&) <$> (('.' ==) <$> peek) <*> (isDigit <$> peekNext))
-  when dotThenDigit $ do
-    void advance
-    whileM_ (isDigit <$> peek) advance
-
-  value <- slice <$> use ssStart <*> use ssCurrent <*> use ssSource
-  addToken (LitNumber $ unsafeFromRight $ Text.double value) NUMBER
-  where unsafeFromRight (Right (x, _)) = x
 
 peekNext :: MonadState ScanState m => m Char
 peekNext = do

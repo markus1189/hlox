@@ -31,6 +31,7 @@ library
                     , text
                     , transformers
                     , unordered-containers
+                    , containers
     hs-source-dirs:   src
     default-language: GHC2021
     default-extensions: LambdaCase
