@@ -1,0 +1,85 @@
+{
+    "errors": [],
+    "tokens": [
+        {
+            "Lexeme": "/",
+            "Line": 3,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "SLASH"
+        },
+        {
+            "Lexeme": "*",
+            "Line": 3,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "STAR"
+        },
+        {
+            "Lexeme": "this",
+            "Line": 3,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "THIS"
+        },
+        {
+            "Lexeme": "is",
+            "Line": 3,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "IDENTIFIER"
+        },
+        {
+            "Lexeme": "a",
+            "Line": 3,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "IDENTIFIER"
+        },
+        {
+            "Lexeme": "block",
+            "Line": 4,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "IDENTIFIER"
+        },
+        {
+            "Lexeme": "comment",
+            "Line": 4,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "IDENTIFIER"
+        },
+        {
+            "Lexeme": "*",
+            "Line": 4,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "STAR"
+        },
+        {
+            "Lexeme": "/",
+            "Line": 4,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "SLASH"
+        },
+        {
+            "Lexeme": "",
+            "Line": 4,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "EOF"
+        }
+    ]
+}

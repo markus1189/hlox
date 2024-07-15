@@ -28,15 +28,15 @@ data StoredScanError = StoredScanError !Natural !Text
 
 $(deriveJSON defaultOptions {constructorTagModifier = drop (length @[] "StoredScan")} ''StoredScanError)
 
-test_goldenScanner :: TestTree
-test_goldenScanner =
-  testGroup
-    "Golden Tests"
-    [ testScanner "numbers" "1 1.2 .1 1.",
-      testScanner "operators" ">= <= != == > < / + -",
-      testScanner "strings" "\"hello\" \"world\"",
-      testScanner "keywords" "and class else false for fun if nil or print return super this true var while"
-    ]
+testScanner :: String -> Text -> TestTree
+testScanner name input = goldenVsString name ("golden" </> name) $ do
+  let (tokens, errors) = scanTokens input
+  pure $
+    encodePretty $
+      Aeson.object
+        [ "tokens" Aeson..= fmap toStoredToken tokens,
+          "errors" Aeson..= fmap toStoredScanError errors
+        ]
 
 toStoredToken :: Token -> StoredToken
 toStoredToken (Token t l lit line) = StoredToken (show t) (l ^. _Lexeme) (toStoredLiteral lit) (line ^. _Line)
@@ -49,12 +49,13 @@ toStoredLiteral LitNothing = StoredLitNothing
 toStoredScanError :: ScanError -> StoredScanError
 toStoredScanError (ScanError l t) = StoredScanError (l ^. _Line) t
 
-testScanner :: String -> Text -> TestTree
-testScanner name input = goldenVsString name ("golden" </> name) $ do
-  let (tokens, errors) = scanTokens input
-  pure $
-    encodePretty $
-      Aeson.object
-        [ "tokens" Aeson..= fmap toStoredToken tokens,
-          "errors" Aeson..= fmap toStoredScanError errors
-        ]
+test_goldenScanner :: TestTree
+test_goldenScanner =
+  testGroup
+    "Golden Tests"
+    [ testScanner "numbers" "1 1.2 .1 1.",
+      testScanner "operators" ">= <= != == > < / + -",
+      testScanner "strings" "\"hello\" \"world\"",
+      testScanner "keywords" "and class else false for fun if nil or print return super this true var while",
+      testScanner "comments" "// this is a comment\n// this is another comment\n/* this is a \nblock comment */"
+    ]
