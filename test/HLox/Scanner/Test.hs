@@ -32,8 +32,9 @@ test_goldenScanner =
   testGroup
     "Golden Tests"
     [ testScanner "numbers" "1 1.2 .1 1.",
-      testScanner "operators" ">= <= != == > <",
-      testScanner "strings" "\"hello\" \"world\""
+      testScanner "operators" ">= <= != == > < / + -",
+      testScanner "strings" "\"hello\" \"world\"",
+      testScanner "keywords" "and class else false for fun if nil or print return super this true var while"
     ]
 
 toStoredToken :: Token -> StoredToken
