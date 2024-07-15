@@ -9,6 +9,7 @@ import Control.Monad.State.Class (MonadState)
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Numeric.Natural (Natural)
+import Control.Monad (when, void)
 
 newtype Line = Line Natural
   deriving (Show, Eq, Ord, Num)
@@ -125,6 +126,7 @@ scanToken = do
     '\r' -> pure ()
     '\t' -> pure ()
     '\n' -> ssLine += 1
+    '"' -> scanString
     _ -> do
       e <- ScanError <$> use ssLine <*> pure "Unexpected character."
       ssErrors |>= e
@@ -169,3 +171,21 @@ peek = do
   if isAtEnd
     then pure '\0'
     else Text.index <$> use ssSource <*> use ssCurrent
+
+scanString :: MonadState ScanState m => m ()
+scanString = do
+  let quote = (/= '"') <$> peek
+  whileM_ ((&&) <$> quote <*> (not <$> scannerIsAtEnd)) $ do
+    isNewline <- (== '\n') <$> peek
+    when isNewline $ ssLine += 1
+    advance
+  isAtEnd <- scannerIsAtEnd
+  if isAtEnd
+    then do
+      e <- ScanError <$> use ssLine <*> pure "Unterminated string."
+      ssErrors |>= e
+    else do
+      -- closing '"'
+      void advance
+      value <- slice <$> ((+1) <$> use ssStart) <*> (subtract 1 <$> use ssCurrent) <*> use ssSource
+      addToken (LitText value) STRING
