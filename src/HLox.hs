@@ -1,19 +1,53 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module HLox (main) where
 
+import Control.Lens.TH (makeLenses)
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad.Reader (ReaderT (runReaderT))
+import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TIO
 import Streaming.Prelude qualified as S
 import System.Environment (getArgs)
 import System.Exit (ExitCode (ExitFailure), exitWith)
+import System.IO (stderr)
+import Control.Lens (view)
+import Control.Monad (when)
 
 data Token = Token !Text
   deriving (Show, Eq, Ord)
 
+data LoxEnv = LoxEnv
+  { _hadError :: IORef Bool
+  }
+
+makeLenses ''LoxEnv
+
+makeLoxEnv :: IO LoxEnv
+makeLoxEnv = LoxEnv <$> newIORef False
+
+newtype Lox a = Lox (ReaderT LoxEnv IO a) deriving (Functor, Applicative, Monad, MonadIO)
+
+runLox :: LoxEnv -> Lox a -> IO a
+runLox e (Lox m) = do
+  runReaderT m e
+
+loxHadError :: Lox Bool
+loxHadError = Lox $ do
+  e <- view hadError
+  liftIO $ readIORef e
+
+loxWriteHadError :: Bool -> Lox ()
+loxWriteHadError b = Lox $ do
+  e <- view hadError
+  liftIO $ writeIORef e b
+
 main :: IO ()
 main = do
+  env <- makeLoxEnv
   TIO.putStrLn "Welcome to the haskell Lox implementation"
   args <- getArgs
   if length args > 1
@@ -21,27 +55,44 @@ main = do
       putStrLn "Usage: jlox [script]"
       exitWith (ExitFailure 64)
     else
-      if length args == 1
-        then runFile $ head args
-        else runPrompt
+      runLox env $
+        if length args == 1
+          then runFile $ head args
+          else runPrompt
 
-runFile :: FilePath -> IO ()
+runFile :: FilePath -> Lox ()
 runFile fp = do
-  script <- TIO.readFile fp
+  script <- liftIO $ TIO.readFile fp
   run script
+  err <- loxHadError
+  when err $ liftIO $ exitWith (ExitFailure 65)
 
-runPrompt :: IO ()
+runPrompt :: Lox ()
 runPrompt = do
   S.effects $
-    S.mapM run $
+    S.mapM mapper $
       S.takeWhile (not . Text.isPrefixOf ":q") $
         S.map Text.pack $
-          S.stdinLn @IO
-  TIO.putStrLn "Goodbye"
+          S.stdinLn @Lox
+  liftIO $ TIO.putStrLn "Goodbye"
+  where
+    mapper :: Text -> Lox ()
+    mapper line = do
+      run line
+      loxWriteHadError False
 
-run :: Text -> IO ()
+run :: Text -> Lox ()
 run script = do
-  print (scanTokens script)
+  liftIO $ print (scanTokens script)
 
 scanTokens :: Text -> [Token]
 scanTokens = map Token . Text.words
+
+loxError :: Int -> Text -> Lox ()
+loxError line message = do
+  report line "" message
+
+report :: Int -> Text -> Text -> Lox ()
+report line loc message = liftIO $ do
+  TIO.hPutStrLn stderr $ "[line " <> Text.pack (show line) <> "] Error" <> loc <> ": " <> message
+  exitWith (ExitFailure line)

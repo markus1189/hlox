@@ -26,6 +26,9 @@ library
                     , filepath
                     , unordered-containers
                     , streaming
+                    , lens
+                    , mtl
+                    , transformers
     hs-source-dirs:   src
     default-language: GHC2021
 
