@@ -1,10 +1,10 @@
 module HLox.Scanner (scanTokens) where
 
-import Control.Lens (to, use, (%=), (.=))
-import Control.Lens.Operators ((+=), (|>=), (<+~))
+import Control.Lens (to, use, (%=), (.=), over, _2, view)
+import Control.Lens.Operators ((+=), (|>=))
 import Control.Lens.TH (makeLenses)
 import Control.Monad.Loops (whileM_)
-import Control.Monad.State (State, evalState)
+import Control.Monad.State (State, runState)
 import Control.Monad.State.Class (MonadState)
 import Data.Text (Text)
 import Data.Text qualified as Text
@@ -22,7 +22,7 @@ newtype Line = Line Natural
 newtype Lexeme = Lexeme Text
   deriving (Show, Eq, Ord)
 
-data Literal = LitNothing | LitText Text | LitNumber Double
+data Literal = LitNothing | LitText !Text | LitNumber !Double
   deriving (Show, Eq, Ord)
 
 data TokenType
@@ -80,15 +80,16 @@ data Token = Token
   }
   deriving (Show, Eq, Ord)
 
-data ScanError = ScanError Line Text
+data ScanError = ScanError !Line !Text deriving (Show, Eq, Ord)
 
 data ScanState = ScanState
-  { _ssStart :: Int,
-    _ssCurrent :: Int,
-    _ssLine :: Line,
-    _ssSource :: Text,
-    _ssTokens :: [Token],
-    _ssErrors :: [ScanError]
+  { _ssStart :: !Int,
+    _ssCurrent :: !Int,
+    _ssLine :: !Line,
+    _ssSource :: !Text,
+    _ssSourceLength :: !Int,
+    _ssTokens :: ![Token],
+    _ssErrors :: ![ScanError]
   }
 
 makeLenses ''ScanState
@@ -112,8 +113,8 @@ reservedKeywords = Map.fromList [("and", AND)
                                 ,("while", WHILE)
                                 ]
 
-scanTokens :: Text -> [Token]
-scanTokens script = flip evalState (ScanState 0 0 (Line 1) script [] []) $ do
+scanTokens :: Text -> ([Token], [ScanError])
+scanTokens script = over _2 (view ssErrors) $ flip runState (ScanState 0 0 (Line 1) script (Text.length script) [] []) $ do
   whileM_ (not <$> scannerIsAtEnd) $ do
     current <- use ssCurrent
     ssStart .= current
@@ -181,7 +182,7 @@ scanString = do
 scanNumber :: MonadState ScanState m => m ()
 scanNumber = do
   whileM_ (isDigit <$> peek) advance
-  dotThenDigit <- ((&&) <$> (('.' ==) <$> peek) <*> (isDigit <$> peekNext))
+  dotThenDigit <- (&&) <$> (('.' ==) <$> peek) <*> (isDigit <$> peekNext)
   when dotThenDigit $ do
     void advance
     whileM_ (isDigit <$> peek) advance
@@ -219,7 +220,7 @@ advance :: (MonadState ScanState m) => m Char
 advance = peek <* (ssCurrent += 1)
 
 scannerIsAtEnd :: (MonadState ScanState m) => m Bool
-scannerIsAtEnd = (>=) <$> use ssCurrent <*> use (ssSource . to Text.length)
+scannerIsAtEnd = (>=) <$> use ssCurrent <*> use ssSourceLength
 
 match :: (MonadState ScanState m) => Char -> m Bool
 match expected = do
@@ -243,7 +244,7 @@ peek = do
 
 peekNext :: MonadState ScanState m => m Char
 peekNext = do
-  isAtEnd <- (>=) <$> use (ssCurrent . to (+1)) <*> use (ssSource . to Text.length)
+  isAtEnd <- (>=) <$> use (ssCurrent . to (+1)) <*> use ssSourceLength
   if isAtEnd
     then pure '\0'
     else Text.index <$> use ssSource <*> use (ssCurrent . to (+1))

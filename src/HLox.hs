@@ -2,7 +2,7 @@ module HLox (main) where
 
 import Control.Lens (view)
 import Control.Lens.TH (makeLenses)
-import Control.Monad (when)
+import Control.Monad (when, unless)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (ReaderT (runReaderT))
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
@@ -79,7 +79,10 @@ runPrompt = do
 
 run :: Text -> Lox ()
 run script = do
-  liftIO $ print $ scanTokens script
+  let (tokens,errs) = scanTokens script
+  unless (null errs) $
+    liftIO $ mapM_ (TIO.hPutStrLn stderr . Text.pack . show) errs
+  liftIO $ print $ tokens
 
 loxError :: Int -> Text -> Lox ()
 loxError line message = do
