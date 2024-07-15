@@ -13,11 +13,17 @@ build-type:         Simple
 extra-doc-files:    CHANGELOG.md
 -- extra-source-files:
 
-common warnings
-    ghc-options: -Wall
+common options
+    ghc-options: -Wall -threaded
+    default-language: GHC2021
+    default-extensions: LambdaCase
+                      , OverloadedStrings
+                      , TemplateHaskell
+                      , TupleSections
+                      , ViewPatterns
 
 library
-    import:           warnings
+    import:           options
     exposed-modules:  HLox
                     , HLox.Scanner
     -- other-modules:
@@ -33,15 +39,9 @@ library
                     , unordered-containers
                     , containers
     hs-source-dirs:   src
-    default-language: GHC2021
-    default-extensions: LambdaCase
-                      , OverloadedStrings
-                      , TemplateHaskell
-                      , TupleSections
-                      , ViewPatterns
 
 executable hlox
-    import:           warnings
+    import:           options
     main-is:          Main.hs
     -- other-modules:
     -- other-extensions:
@@ -53,13 +53,23 @@ executable hlox
     default-language: GHC2021
 
 test-suite hlox-test
-    import:           warnings
+    import:           options
     default-language: GHC2021
-    -- other-modules:
+    other-modules:    HLox.Scanner.Test
     -- other-extensions:
     type:             exitcode-stdio-1.0
     hs-source-dirs:   test
-    main-is:          Main.hs
-    build-depends:
-        base ^>=4.18.2.1,
-        hlox
+    main-is:            Driver.hs
+    build-depends:     base ^>=4.18.2.1
+                     , hlox
+                     , hspec
+                     , tasty
+                     , tasty-discover
+                     , tasty-golden
+                     , tasty-hspec
+                     , text
+                     , aeson
+                     , lens
+                     , filepath
+    build-tool-depends: tasty-discover:tasty-discover
+    other-modules:      HLox.Scanner.Test

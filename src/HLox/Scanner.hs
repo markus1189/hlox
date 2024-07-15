@@ -1,6 +1,6 @@
-module HLox.Scanner (scanTokens) where
+module HLox.Scanner (scanTokens, Token(..), TokenType(..), Line, _Line, Lexeme, _Lexeme, Literal(..), ScanError(..)) where
 
-import Control.Lens (to, use, (%=), (.=), over, _2, view)
+import Control.Lens (to, use, (%=), (.=), over, _2, view, makePrisms)
 import Control.Lens.Operators ((+=), (|>=))
 import Control.Lens.TH (makeLenses)
 import Control.Monad.Loops (whileM_)
@@ -18,12 +18,15 @@ import Data.Maybe (fromMaybe)
 
 newtype Line = Line Natural
   deriving (Show, Eq, Ord, Num)
+makePrisms ''Line
 
 newtype Lexeme = Lexeme Text
   deriving (Show, Eq, Ord)
+makePrisms ''Lexeme
 
 data Literal = LitNothing | LitText !Text | LitNumber !Double
   deriving (Show, Eq, Ord)
+makePrisms ''Literal
 
 data TokenType
   = -- Single-character tokens.
