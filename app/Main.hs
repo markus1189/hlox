@@ -1,6 +1,6 @@
 module Main where
 
-import qualified HLox (main)
+import HLox qualified (main)
 
 main :: IO ()
 main = HLox.main

@@ -2,19 +2,18 @@ module HLox (main) where
 
 import Control.Lens (view)
 import Control.Lens.TH (makeLenses)
-import Control.Monad (when, unless)
+import Control.Monad (unless, when)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (ReaderT (runReaderT))
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TIO
+import HLox.Scanner (scanTokens)
 import Streaming.Prelude qualified as S
 import System.Environment (getArgs)
 import System.Exit (ExitCode (ExitFailure), exitWith)
 import System.IO (stderr)
-
-import HLox.Scanner (scanTokens)
 
 data LoxEnv = LoxEnv
   { _hadError :: IORef Bool
@@ -79,9 +78,10 @@ runPrompt = do
 
 run :: Text -> Lox ()
 run script = do
-  let (tokens,errs) = scanTokens script
+  let (tokens, errs) = scanTokens script
   unless (null errs) $
-    liftIO $ mapM_ (TIO.hPutStrLn stderr . Text.pack . show) errs
+    liftIO $
+      mapM_ (TIO.hPutStrLn stderr . Text.pack . show) errs
   liftIO $ print $ tokens
 
 loxError :: Int -> Text -> Lox ()

@@ -2,6 +2,7 @@ module HLox.Scanner.Test where
 
 import Control.Lens.Operators ((^.))
 import Data.Aeson qualified as Aeson
+import Data.Aeson.Encode.Pretty (encodePretty)
 import Data.Aeson.TH (Options (constructorTagModifier, fieldLabelModifier), defaultOptions, deriveJSON)
 import Data.Text (Text)
 import HLox.Scanner (Literal (..), ScanError (..), Token (..), scanTokens, _Lexeme, _Line)
@@ -9,7 +10,6 @@ import Numeric.Natural (Natural)
 import System.FilePath ((</>))
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Golden (goldenVsString)
-import Data.Aeson.Encode.Pretty (encodePretty)
 
 data StoredLiteral = StoredLitNothing | StoredLitText !Text | StoredLitNumber !Double
 
