@@ -9,6 +9,7 @@ import Numeric.Natural (Natural)
 import System.FilePath ((</>))
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Golden (goldenVsString)
+import Data.Aeson.Encode.Pretty (encodePretty)
 
 data StoredLiteral = StoredLitNothing | StoredLitText !Text | StoredLitNumber !Double
 
@@ -52,7 +53,7 @@ testScanner :: String -> Text -> TestTree
 testScanner name input = goldenVsString name ("golden" </> name) $ do
   let (tokens, errors) = scanTokens input
   pure $
-    Aeson.encode $
+    encodePretty $
       Aeson.object
         [ "tokens" Aeson..= fmap toStoredToken tokens,
           "errors" Aeson..= fmap toStoredScanError errors

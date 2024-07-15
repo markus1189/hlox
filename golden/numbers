@@ -1,1 +1,65 @@
-{"errors":[],"tokens":[{"Lexeme":"1","Line":1,"Literal":{"contents":1,"tag":"Number"},"Type":"NUMBER"},{"Lexeme":"1.2","Line":1,"Literal":{"contents":1.2,"tag":"Number"},"Type":"NUMBER"},{"Lexeme":".","Line":1,"Literal":{"tag":"Nothing"},"Type":"DOT"},{"Lexeme":"1","Line":1,"Literal":{"contents":1,"tag":"Number"},"Type":"NUMBER"},{"Lexeme":"1","Line":1,"Literal":{"contents":1,"tag":"Number"},"Type":"NUMBER"},{"Lexeme":".","Line":1,"Literal":{"tag":"Nothing"},"Type":"DOT"},{"Lexeme":"","Line":1,"Literal":{"tag":"Nothing"},"Type":"EOF"}]}
+{
+    "errors": [],
+    "tokens": [
+        {
+            "Lexeme": "1",
+            "Line": 1,
+            "Literal": {
+                "contents": 1,
+                "tag": "Number"
+            },
+            "Type": "NUMBER"
+        },
+        {
+            "Lexeme": "1.2",
+            "Line": 1,
+            "Literal": {
+                "contents": 1.2,
+                "tag": "Number"
+            },
+            "Type": "NUMBER"
+        },
+        {
+            "Lexeme": ".",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "DOT"
+        },
+        {
+            "Lexeme": "1",
+            "Line": 1,
+            "Literal": {
+                "contents": 1,
+                "tag": "Number"
+            },
+            "Type": "NUMBER"
+        },
+        {
+            "Lexeme": "1",
+            "Line": 1,
+            "Literal": {
+                "contents": 1,
+                "tag": "Number"
+            },
+            "Type": "NUMBER"
+        },
+        {
+            "Lexeme": ".",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "DOT"
+        },
+        {
+            "Lexeme": "",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "EOF"
+        }
+    ]
+}

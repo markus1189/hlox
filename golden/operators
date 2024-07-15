@@ -1,1 +1,85 @@
-{"errors":[],"tokens":[{"Lexeme":">=","Line":1,"Literal":{"tag":"Nothing"},"Type":"GREATER_EQUAL"},{"Lexeme":"<=","Line":1,"Literal":{"tag":"Nothing"},"Type":"LESS_EQUAL"},{"Lexeme":"!=","Line":1,"Literal":{"tag":"Nothing"},"Type":"BANG_EQUAL"},{"Lexeme":"==","Line":1,"Literal":{"tag":"Nothing"},"Type":"EQUAL_EQUAL"},{"Lexeme":">","Line":1,"Literal":{"tag":"Nothing"},"Type":"GREATER"},{"Lexeme":"<","Line":1,"Literal":{"tag":"Nothing"},"Type":"LESS"},{"Lexeme":"/","Line":1,"Literal":{"tag":"Nothing"},"Type":"SLASH"},{"Lexeme":"+","Line":1,"Literal":{"tag":"Nothing"},"Type":"PLUS"},{"Lexeme":"-","Line":1,"Literal":{"tag":"Nothing"},"Type":"MINUS"},{"Lexeme":"","Line":1,"Literal":{"tag":"Nothing"},"Type":"EOF"}]}
+{
+    "errors": [],
+    "tokens": [
+        {
+            "Lexeme": ">=",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "GREATER_EQUAL"
+        },
+        {
+            "Lexeme": "<=",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "LESS_EQUAL"
+        },
+        {
+            "Lexeme": "!=",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "BANG_EQUAL"
+        },
+        {
+            "Lexeme": "==",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "EQUAL_EQUAL"
+        },
+        {
+            "Lexeme": ">",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "GREATER"
+        },
+        {
+            "Lexeme": "<",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "LESS"
+        },
+        {
+            "Lexeme": "/",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "SLASH"
+        },
+        {
+            "Lexeme": "+",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "PLUS"
+        },
+        {
+            "Lexeme": "-",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "MINUS"
+        },
+        {
+            "Lexeme": "",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "EOF"
+        }
+    ]
+}

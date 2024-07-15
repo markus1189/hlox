@@ -1,1 +1,141 @@
-{"errors":[],"tokens":[{"Lexeme":"and","Line":1,"Literal":{"tag":"Nothing"},"Type":"AND"},{"Lexeme":"class","Line":1,"Literal":{"tag":"Nothing"},"Type":"CLASS"},{"Lexeme":"else","Line":1,"Literal":{"tag":"Nothing"},"Type":"ELSE"},{"Lexeme":"false","Line":1,"Literal":{"tag":"Nothing"},"Type":"FALSE"},{"Lexeme":"for","Line":1,"Literal":{"tag":"Nothing"},"Type":"FOR"},{"Lexeme":"fun","Line":1,"Literal":{"tag":"Nothing"},"Type":"FUN"},{"Lexeme":"if","Line":1,"Literal":{"tag":"Nothing"},"Type":"IF"},{"Lexeme":"nil","Line":1,"Literal":{"tag":"Nothing"},"Type":"NIL"},{"Lexeme":"or","Line":1,"Literal":{"tag":"Nothing"},"Type":"OR"},{"Lexeme":"print","Line":1,"Literal":{"tag":"Nothing"},"Type":"PRINT"},{"Lexeme":"return","Line":1,"Literal":{"tag":"Nothing"},"Type":"RETURN"},{"Lexeme":"super","Line":1,"Literal":{"tag":"Nothing"},"Type":"SUPER"},{"Lexeme":"this","Line":1,"Literal":{"tag":"Nothing"},"Type":"THIS"},{"Lexeme":"true","Line":1,"Literal":{"tag":"Nothing"},"Type":"TRUE"},{"Lexeme":"var","Line":1,"Literal":{"tag":"Nothing"},"Type":"VAR"},{"Lexeme":"while","Line":1,"Literal":{"tag":"Nothing"},"Type":"WHILE"},{"Lexeme":"","Line":1,"Literal":{"tag":"Nothing"},"Type":"EOF"}]}
+{
+    "errors": [],
+    "tokens": [
+        {
+            "Lexeme": "and",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "AND"
+        },
+        {
+            "Lexeme": "class",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "CLASS"
+        },
+        {
+            "Lexeme": "else",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "ELSE"
+        },
+        {
+            "Lexeme": "false",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "FALSE"
+        },
+        {
+            "Lexeme": "for",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "FOR"
+        },
+        {
+            "Lexeme": "fun",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "FUN"
+        },
+        {
+            "Lexeme": "if",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "IF"
+        },
+        {
+            "Lexeme": "nil",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "NIL"
+        },
+        {
+            "Lexeme": "or",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "OR"
+        },
+        {
+            "Lexeme": "print",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "PRINT"
+        },
+        {
+            "Lexeme": "return",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "RETURN"
+        },
+        {
+            "Lexeme": "super",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "SUPER"
+        },
+        {
+            "Lexeme": "this",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "THIS"
+        },
+        {
+            "Lexeme": "true",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "TRUE"
+        },
+        {
+            "Lexeme": "var",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "VAR"
+        },
+        {
+            "Lexeme": "while",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "WHILE"
+        },
+        {
+            "Lexeme": "",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "EOF"
+        }
+    ]
+}
