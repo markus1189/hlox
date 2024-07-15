@@ -5,6 +5,7 @@ import Data.Aeson qualified as Aeson
 import Data.Aeson.Encode.Pretty (encodePretty)
 import Data.Aeson.TH (Options (constructorTagModifier, fieldLabelModifier), defaultOptions, deriveJSON)
 import Data.Text (Text)
+import Data.Text qualified as Text
 import HLox.Scanner (Literal (..), ScanError (..), Token (..), scanTokens, _Lexeme, _Line)
 import Numeric.Natural (Natural)
 import System.FilePath ((</>))
@@ -57,5 +58,13 @@ test_goldenScanner =
       testScanner "operators" ">= <= != == > < / + -",
       testScanner "strings" "\"hello\" \"world\"",
       testScanner "keywords" "and class else false for fun if nil or print return super this true var while",
-      testScanner "comments" "// this is a comment\n// this is another comment\n/* this is a \nblock comment */\n42/* this comment is not closed\n1 + 1 == 5"
+      testScanner "comments" $
+        Text.intercalate
+          "\n"
+          [ "// this is a comment",
+            "// this is another comment",
+            "/* this is a \nblock comment */",
+            "/* this comment is not closed\n1 + 1 == 5",
+            "/* stars inside: 3*3 5 * 1 */"
+          ]
     ]
