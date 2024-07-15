@@ -145,11 +145,10 @@ scanToken = do
     '<' -> match' '=' LESS_EQUAL LESS >>= addToken'
     '>' -> match' '=' GREATER_EQUAL GREATER >>= addToken'
     '/' -> do
-      b <- match '/'
-      if b
-        then do
-          whileM_ ((&&) <$> ((/= '\n') <$> peek) <*> (not <$> scannerIsAtEnd)) advance
-        else addToken' SLASH
+      nextChar <- peek
+      case nextChar of
+        '/' -> whileM_ ((&&) <$> ((/= '\n') <$> peek) <*> (not <$> scannerIsAtEnd)) advance
+        _ -> addToken' SLASH
     ' ' -> pure ()
     '\r' -> pure ()
     '\t' -> pure ()
