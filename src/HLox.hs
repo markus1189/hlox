@@ -1,9 +1,8 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
-
 module HLox (main) where
 
+import Control.Lens (view)
 import Control.Lens.TH (makeLenses)
+import Control.Monad (when)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (ReaderT (runReaderT))
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
@@ -14,11 +13,8 @@ import Streaming.Prelude qualified as S
 import System.Environment (getArgs)
 import System.Exit (ExitCode (ExitFailure), exitWith)
 import System.IO (stderr)
-import Control.Lens (view)
-import Control.Monad (when)
 
-data Token = Token !Text
-  deriving (Show, Eq, Ord)
+import HLox.Scanner (scanTokens)
 
 data LoxEnv = LoxEnv
   { _hadError :: IORef Bool
@@ -83,10 +79,7 @@ runPrompt = do
 
 run :: Text -> Lox ()
 run script = do
-  liftIO $ print (scanTokens script)
-
-scanTokens :: Text -> [Token]
-scanTokens = map Token . Text.words
+  liftIO $ print $ scanTokens script
 
 loxError :: Int -> Text -> Lox ()
 loxError line message = do
