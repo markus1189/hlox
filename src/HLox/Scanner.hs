@@ -1,31 +1,35 @@
-module HLox.Scanner (scanTokens, Token(..), TokenType(..), Line, _Line, Lexeme, _Lexeme, Literal(..), ScanError(..)) where
+module HLox.Scanner (scanTokens, Token (..), TokenType (..), Line, _Line, Lexeme, _Lexeme, Literal (..), ScanError (..)) where
 
-import Control.Lens (to, use, (%=), (.=), over, _2, view, makePrisms)
+import Control.Lens (makePrisms, over, to, use, view, (%=), (.=), _2)
 import Control.Lens.Operators ((+=), (|>=))
 import Control.Lens.TH (makeLenses)
+import Control.Monad (replicateM_, void)
+import Control.Monad.Extra (unlessM, whenM)
 import Control.Monad.Loops (whileM_)
 import Control.Monad.State (State, runState)
 import Control.Monad.State.Class (MonadState)
+import Data.Char (isDigit)
+import Data.Map (Map)
+import Data.Map.Strict qualified as Map
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.Read qualified as Text
 import Numeric.Natural (Natural)
-import Control.Monad (when, void)
-import Data.Char (isDigit)
-import Data.Map (Map)
-import qualified Data.Map.Strict as Map
-import Data.Maybe (fromMaybe)
 
 newtype Line = Line Natural
   deriving (Show, Eq, Ord, Num)
+
 makePrisms ''Line
 
 newtype Lexeme = Lexeme Text
   deriving (Show, Eq, Ord)
+
 makePrisms ''Lexeme
 
 data Literal = LitNothing | LitText !Text | LitNumber !Double
   deriving (Show, Eq, Ord)
+
 makePrisms ''Literal
 
 data TokenType
@@ -94,27 +98,30 @@ data ScanState = ScanState
     _ssTokens :: ![Token],
     _ssErrors :: ![ScanError]
   }
+  deriving (Show)
 
 makeLenses ''ScanState
 
 reservedKeywords :: Map Text TokenType
-reservedKeywords = Map.fromList [("and", AND)
-                                ,("class", CLASS)
-                                ,("else", ELSE)
-                                ,("false", FALSE)
-                                ,("for", FOR)
-                                ,("fun", FUN)
-                                ,("if", IF)
-                                ,("nil", NIL)
-                                ,("or", OR)
-                                ,("print", PRINT)
-                                ,("return", RETURN)
-                                ,("super", SUPER)
-                                ,("this", THIS)
-                                ,("true", TRUE)
-                                ,("var", VAR)
-                                ,("while", WHILE)
-                                ]
+reservedKeywords =
+  Map.fromList
+    [ ("and", AND),
+      ("class", CLASS),
+      ("else", ELSE),
+      ("false", FALSE),
+      ("for", FOR),
+      ("fun", FUN),
+      ("if", IF),
+      ("nil", NIL),
+      ("or", OR),
+      ("print", PRINT),
+      ("return", RETURN),
+      ("super", SUPER),
+      ("this", THIS),
+      ("true", TRUE),
+      ("var", VAR),
+      ("while", WHILE)
+    ]
 
 scanTokens :: Text -> ([Token], [ScanError])
 scanTokens script = over _2 (view ssErrors) $ flip runState (ScanState 0 0 (Line 1) script (Text.length script) [] []) $ do
@@ -148,6 +155,9 @@ scanToken = do
       nextChar <- peek
       case nextChar of
         '/' -> whileM_ ((&&) <$> ((/= '\n') <$> peek) <*> (not <$> scannerIsAtEnd)) advance
+        '*' -> do
+          replicateM_ 2 advance
+          scanBlockComment
         _ -> addToken' SLASH
     ' ' -> pure ()
     '\r' -> pure ()
@@ -163,12 +173,11 @@ scanToken = do
     addToken' = addToken LitNothing
     match' c t f = match c >>= \b -> if b then pure t else pure f
 
-scanString :: MonadState ScanState m => m ()
+scanString :: (MonadState ScanState m) => m ()
 scanString = do
   let quote = (/= '"') <$> peek
   whileM_ ((&&) <$> quote <*> (not <$> scannerIsAtEnd)) $ do
-    isNewline <- (== '\n') <$> peek
-    when isNewline $ ssLine += 1
+    whenM ((== '\n') <$> peek) $ ssLine += 1
     advance
   isAtEnd <- scannerIsAtEnd
   if isAtEnd
@@ -178,30 +187,41 @@ scanString = do
     else do
       -- closing '"'
       void advance
-      value <- slice <$> ((+1) <$> use ssStart) <*> (subtract 1 <$> use ssCurrent) <*> use ssSource
+      value <- slice <$> ((+ 1) <$> use ssStart) <*> (subtract 1 <$> use ssCurrent) <*> use ssSource
       addToken (LitText value) STRING
 
-scanNumber :: MonadState ScanState m => m ()
+scanNumber :: (MonadState ScanState m) => m ()
 scanNumber = do
   whileM_ (isDigit <$> peek) advance
-  dotThenDigit <- (&&) <$> (('.' ==) <$> peek) <*> (isDigit <$> peekNext)
-  when dotThenDigit $ do
+  whenM ((&&) <$> (('.' ==) <$> peek) <*> (isDigit <$> peekNext)) $ do
     void advance
     whileM_ (isDigit <$> peek) advance
 
   value <- slice <$> use ssStart <*> use ssCurrent <*> use ssSource
   addToken (LitNumber $ unsafeFromRight $ Text.double value) NUMBER
-  where unsafeFromRight (Right (x, _)) = x
+  where
+    unsafeFromRight (Right (x, _)) = x
 
-scanIdentifier ::MonadState ScanState m => m ()
+scanIdentifier :: (MonadState ScanState m) => m ()
 scanIdentifier = do
   whileM_ (isAlphaNumeric <$> peek) advance
   value <- slice <$> use ssStart <*> use ssCurrent <*> use ssSource
   let t = fromMaybe IDENTIFIER $ Map.lookup value reservedKeywords
   addToken LitNothing t
 
+scanBlockComment :: (MonadState ScanState m) => m ()
+scanBlockComment = do
+  whileM_ ((&&) <$> ((/= '*') <$> peek) <*> (not <$> scannerIsAtEnd)) advance
+  c1 <- peek
+  c2 <- peekNext
+  case [c1, c2] of
+    "*/" -> do
+      replicateM_ 2 advance
+    _ -> do
+      unlessM scannerIsAtEnd $ advance >> scanBlockComment
+
 isAlpha :: Char -> Bool
-isAlpha = flip elem $ ['a'..'z'] ++ ['A'..'Z'] ++ ['_']
+isAlpha = flip elem $ ['a' .. 'z'] ++ ['A' .. 'Z'] ++ ['_']
 
 isAlphaNumeric :: Char -> Bool
 isAlphaNumeric = (||) <$> isAlpha <*> isDigit
@@ -244,9 +264,9 @@ peek = do
     then pure '\0'
     else Text.index <$> use ssSource <*> use ssCurrent
 
-peekNext :: MonadState ScanState m => m Char
+peekNext :: (MonadState ScanState m) => m Char
 peekNext = do
-  isAtEnd <- (>=) <$> use (ssCurrent . to (+1)) <*> use ssSourceLength
+  isAtEnd <- (>=) <$> use (ssCurrent . to (+ 1)) <*> use ssSourceLength
   if isAtEnd
     then pure '\0'
-    else Text.index <$> use ssSource <*> use (ssCurrent . to (+1))
+    else Text.index <$> use ssSource <*> use (ssCurrent . to (+ 1))

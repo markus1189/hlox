@@ -57,5 +57,5 @@ test_goldenScanner =
       testScanner "operators" ">= <= != == > < / + -",
       testScanner "strings" "\"hello\" \"world\"",
       testScanner "keywords" "and class else false for fun if nil or print return super this true var while",
-      testScanner "comments" "// this is a comment\n// this is another comment\n/* this is a \nblock comment */"
+      testScanner "comments" "// this is a comment\n// this is another comment\n/* this is a \nblock comment */\n42/* this comment is not closed\n1 + 1 == 5"
     ]
