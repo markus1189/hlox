@@ -1,15 +1,19 @@
-build:
+build: format
     #!/usr/bin/env bash
     cabal build
 
-test:
+test: format
     #!/usr/bin/env bash
     cabal test
 
-accept:
+accept: format
     #!/usr/bin/env bash
     cabal test --test-options=--accept
 
 format:
     #!/usr/bin/env bash
     ormolu --mode inplace $(git ls-files '*.hs')
+
+check-format:
+    #!/usr/bin/env bash
+    ormolu --mode check $(find . -name '*.hs')
