@@ -1,1 +1,1 @@
-{"errors":[],"tokens":[{"Lexeme":"\"hello\"","Line":1,"Literal":{"contents":"hello","tag":"LitText"},"Type":"STRING"},{"Lexeme":"\"world\"","Line":1,"Literal":{"contents":"world","tag":"LitText"},"Type":"STRING"},{"Lexeme":"","Line":1,"Literal":{"tag":"LitNothing"},"Type":"EOF"}]}
+{"errors":[],"tokens":[{"Lexeme":"\"hello\"","Line":1,"Literal":{"contents":"hello","tag":"Text"},"Type":"STRING"},{"Lexeme":"\"world\"","Line":1,"Literal":{"contents":"world","tag":"Text"},"Type":"STRING"},{"Lexeme":"","Line":1,"Literal":{"tag":"Nothing"},"Type":"EOF"}]}
