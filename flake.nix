@@ -30,7 +30,7 @@
 
         devShell = pkgs.mkShell {
           inputsFrom = [ devEnv ];
-          buildInputs = with hsPkgs; [ haskell-language-server implicit-hie ];
+          buildInputs = with hsPkgs; [ pkgs.just haskell-language-server implicit-hie ];
         };
       });
 }
