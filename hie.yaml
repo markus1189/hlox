@@ -1,0 +1,10 @@
+cradle:
+  cabal:
+    - path: "src"
+      component: "lib:hlox"
+
+    - path: "app/Main.hs"
+      component: "hlox:exe:hlox"
+
+    - path: "test"
+      component: "hlox:test:hlox-test"
