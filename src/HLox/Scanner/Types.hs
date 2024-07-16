@@ -15,7 +15,7 @@ newtype Lexeme = Lexeme Text
 
 makePrisms ''Lexeme
 
-data Literal = LitNothing | LitText !Text | LitNumber !Double
+data Literal = LitNothing | LitText !Text | LitNumber !Double | LitBool !Bool
   deriving (Show, Eq, Ord)
 
 makePrisms ''Literal
@@ -74,19 +74,7 @@ data Token = Token
     _line :: !Line
   }
   deriving (Show, Eq, Ord)
+
 makeLenses ''Token
 
 data ScanError = ScanError !Line !Text deriving (Show, Eq, Ord)
-
-data ScanState = ScanState
-  { _ssStart :: !Int,
-    _ssCurrent :: !Int,
-    _ssLine :: !Line,
-    _ssSource :: !Text,
-    _ssSourceLength :: !Int,
-    _ssTokens :: ![Token],
-    _ssErrors :: ![ScanError]
-  }
-  deriving (Show)
-
-makeLenses ''ScanState

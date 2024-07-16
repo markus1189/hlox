@@ -1,5 +1,7 @@
 module HLox.Parser.Types where
 
+import Control.Exception (Exception)
+import Data.Text (Text)
 import HLox.Scanner.Types
 
 data Expr
@@ -8,3 +10,7 @@ data Expr
   | ExprLiteral !Literal
   | ExprUnary !Token !Expr
   deriving (Show, Eq, Ord)
+
+data ParseError = ParseError !Token !Text deriving (Show, Eq)
+
+instance Exception ParseError

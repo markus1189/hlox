@@ -26,6 +26,8 @@ common options
 library
     import:           options
     exposed-modules:  HLox
+                    , HLox.Util
+                    , HLox.Types
                     , HLox.Scanner
                     , HLox.Scanner.Types
                     , HLox.Parser.Types
@@ -34,17 +36,19 @@ library
     -- other-extensions:
     build-depends:    base ^>=4.18.2.1
                     , containers
+                    , exceptions
                     , extra
                     , filepath
+                    , formatting
                     , lens ^>=5.3.0
                     , monad-loops
                     , mtl
                     , streaming
+                    , string-interpolate
                     , text
                     , transformers
                     , unordered-containers
-                    , string-interpolate
-                    , formatting
+                    , vector
     hs-source-dirs:   src
 
 executable hlox

@@ -2,6 +2,7 @@ module HLox.Scanner (scanTokens, Token (..), TokenType (..), Line, _Line, Lexeme
 
 import Control.Lens (over, to, use, view, (%=), (.=), _2)
 import Control.Lens.Operators ((+=), (|>=))
+import Control.Lens.TH (makeLenses)
 import Control.Monad (replicateM_, void)
 import Control.Monad.Extra (unlessM, whenM)
 import Control.Monad.Loops (whileM_)
@@ -15,6 +16,19 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.Read qualified as Text
 import HLox.Scanner.Types
+
+data ScanState = ScanState
+  { _ssStart :: !Int,
+    _ssCurrent :: !Int,
+    _ssLine :: !Line,
+    _ssSource :: !Text,
+    _ssSourceLength :: !Int,
+    _ssTokens :: ![Token],
+    _ssErrors :: ![ScanError]
+  }
+  deriving (Show)
+
+makeLenses ''ScanState
 
 reservedKeywords :: Map Text TokenType
 reservedKeywords =

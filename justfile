@@ -18,6 +18,10 @@ check-format:
     #!/usr/bin/env bash
     ormolu --mode check $(find . -name '*.hs')
 
-repl:
+repl: format
     #!/usr/bin/env bash
     cabal repl
+
+run: format
+    #!/usr/bin/env bash
+    cabal run
