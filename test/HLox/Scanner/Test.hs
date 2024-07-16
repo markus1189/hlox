@@ -12,7 +12,7 @@ import System.FilePath ((</>))
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Golden (goldenVsString)
 
-data StoredLiteral = StoredLitNothing | StoredLitText !Text | StoredLitNumber !Double
+data StoredLiteral = StoredLitNothing | StoredLitText !Text | StoredLitNumber !Double | StoredLitBool !Bool
 
 $(deriveJSON defaultOptions {constructorTagModifier = drop (length @[] "StoredLit")} ''StoredLiteral)
 
@@ -46,6 +46,7 @@ toStoredLiteral :: Literal -> StoredLiteral
 toStoredLiteral (LitText t) = StoredLitText t
 toStoredLiteral (LitNumber n) = StoredLitNumber n
 toStoredLiteral LitNothing = StoredLitNothing
+toStoredLiteral (LitBool b) = StoredLitBool b
 
 toStoredScanError :: ScanError -> StoredScanError
 toStoredScanError (ScanError l t) = StoredScanError (l ^. _Line) t
@@ -66,5 +67,6 @@ test_goldenScanner =
             "/* this is a \nblock comment */",
             "/* this comment is not closed\n1 + 1 == 5",
             "/* stars inside: 3*3 5 * 1 */"
-          ]
+          ],
+      testScanner "booleans" "true false"
     ]

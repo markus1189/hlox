@@ -1,0 +1,29 @@
+{
+    "errors": [],
+    "tokens": [
+        {
+            "Lexeme": "true",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "TRUE"
+        },
+        {
+            "Lexeme": "false",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "FALSE"
+        },
+        {
+            "Lexeme": "",
+            "Line": 1,
+            "Literal": {
+                "tag": "Nothing"
+            },
+            "Type": "EOF"
+        }
+    ]
+}

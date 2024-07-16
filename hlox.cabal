@@ -79,6 +79,7 @@ test-suite hlox-test
                      , hlox
                      , hspec
                      , lens
+                     , string-conversions
                      , tasty
                      , tasty-discover
                      , tasty-golden
