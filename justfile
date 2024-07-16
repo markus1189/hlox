@@ -17,3 +17,7 @@ format:
 check-format:
     #!/usr/bin/env bash
     ormolu --mode check $(find . -name '*.hs')
+
+repl:
+    #!/usr/bin/env bash
+    cabal repl
