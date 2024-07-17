@@ -22,6 +22,12 @@ spec_interpreter = do
       it "should concatenate strings" $ do
         Right result <- interpret' [i|"Hello" + " " + "World"|]
         result `shouldBe` LoxText "Hello World"
+      it "should stringify lhs operands" $ do
+        Right result <- interpret' [i|42 + "!"|]
+        result `shouldBe` LoxText "42!"
+      it "should stringify rhs operands" $ do
+        Right result <- interpret' [i|"Answer: " + 42|]
+        result `shouldBe` LoxText "Answer: 42"
 
 interpret' :: Text -> IO (Either InterpretError LoxValue)
 interpret' input = do

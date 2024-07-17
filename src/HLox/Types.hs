@@ -7,8 +7,8 @@ import Control.Monad.Reader (ReaderT (runReaderT))
 import Data.IORef (IORef, newIORef)
 
 data LoxEnv = LoxEnv
-  { _hadError :: IORef Bool
-  , _hadRuntimeError :: IORef Bool
+  { _hadError :: IORef Bool,
+    _hadRuntimeError :: IORef Bool
   }
 
 makeLenses ''LoxEnv

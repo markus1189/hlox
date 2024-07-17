@@ -1,7 +1,7 @@
 module HLox.Interpreter (interpret) where
 
 import Control.Applicative ((<|>))
-import Control.Lens.Combinators (_Right)
+import Control.Lens.Combinators (to, _Right)
 import Control.Lens.Operators ((^.), (^?))
 import Data.Either.Combinators (maybeToRight)
 import Data.Text qualified as Text
@@ -43,7 +43,7 @@ interpret (ExprBinary lhs op rhs) = case opType of
   PLUS ->
     maybeToRight (InterpretError op "Invalid plus operands") $
       let addNumbers = fmap LoxNumber $ (+) <$> e1 ^? _Right . _LoxNumber <*> e2 ^? _Right . _LoxNumber
-          addStrings = fmap LoxText $ Text.append <$> e1 ^? _Right . _LoxText <*> e2 ^? _Right . _LoxText
+          addStrings = fmap LoxText $ Text.append <$> e1 ^? _Right . to stringify <*> e2 ^? _Right . to stringify
        in addNumbers <|> addStrings
   _ -> Left (InterpretError op "Invalid operand case")
   where
