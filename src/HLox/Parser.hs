@@ -54,19 +54,20 @@ instance Pretty [Stmt] where
       pretty' (StmtExpr e) = pretty e
       pretty' (StmtPrint e) = [i|(print #{pretty e})|]
 
+parseWith :: StateT ParseState Lox a -> [Token] -> Lox (Either ParseError a)
+parseWith p tokens = try $ (fst <$> (runStateT @_ @Lox) p (ParseState 0 (Vector.fromList tokens)))
+
 parse :: [Token] -> Lox (Either ParseError [Stmt])
-parse tokens = try $ do
-  fmap fst $ flip (runStateT @_ @Lox) (ParseState 0 (Vector.fromList tokens)) $ do
-    whileM (not <$> isAtEnd) parseStatement
+parse = parseWith parseStatements
 
 parseExpr :: [Token] -> Lox (Either ParseError Expr)
-parseExpr tokens = try $ do
-  fmap fst $ flip (runStateT @_ @Lox) (ParseState 0 (Vector.fromList tokens)) $ do
-    parseExpression
+parseExpr = parseWith parseExpression
+
+parseStatements :: StateT ParseState Lox [Stmt]
+parseStatements = whileM (not <$> isAtEnd) parseStatement
 
 parseStatement :: StateT ParseState Lox Stmt
-parseStatement = do
-  ifM (match [PRINT]) parsePrintStatement parseExpressionStatement
+parseStatement = ifM (match [PRINT]) parsePrintStatement parseExpressionStatement
 
 parsePrintStatement :: StateT ParseState Lox Stmt
 parsePrintStatement = do
@@ -96,7 +97,7 @@ parseFactor :: StateT ParseState Lox Expr
 parseFactor = parseBinary parseUnary [SLASH, STAR]
 
 parseUnary :: StateT ParseState Lox Expr
-parseUnary = do
+parseUnary =
   ifM
     (match [BANG, MINUS])
     ( do
@@ -106,27 +107,26 @@ parseUnary = do
     parsePrimary
 
 parsePrimary :: StateT ParseState Lox Expr
-parsePrimary = do
-  ifM (match [FALSE]) (pure $ ExprLiteral (LitBool False))
-    $ ifM (match [TRUE]) (pure $ ExprLiteral (LitBool True))
-    $ ifM (match [NIL]) (pure $ ExprLiteral LitNothing)
-    $ ifM
-      (match [NUMBER, STRING])
-      ( do
-          n <- previous
-          pure $ ExprLiteral (n ^. literal)
-      )
-    $ ifM
-      (match [LEFT_PAREN])
-      ( do
-          e <- parseExpression
-          void $ consume RIGHT_PAREN "Expect ')' after expression."
-          pure $ ExprGrouping e
-      )
-    $ do
-      t <- peek
-      err <- lift $ createError t "Expect expression."
-      liftIO . throwIO $ err
+parsePrimary = ifM (match [FALSE]) (pure $ ExprLiteral (LitBool False))
+  $ ifM (match [TRUE]) (pure $ ExprLiteral (LitBool True))
+  $ ifM (match [NIL]) (pure $ ExprLiteral LitNothing)
+  $ ifM
+    (match [NUMBER, STRING])
+    ( do
+        n <- previous
+        pure $ ExprLiteral (n ^. literal)
+    )
+  $ ifM
+    (match [LEFT_PAREN])
+    ( do
+        e <- parseExpression
+        void $ consume RIGHT_PAREN "Expect ')' after expression."
+        pure $ ExprGrouping e
+    )
+  $ do
+    t <- peek
+    err <- lift $ createError t "Expect expression."
+    liftIO . throwIO $ err
 
 parseBinary :: (MonadState ParseState m) => m Expr -> [TokenType] -> m Expr
 parseBinary p ts = do
@@ -174,11 +174,10 @@ previous :: (MonadState ParseState m) => m Token
 previous = (!) <$> use psTokens <*> use (psCurrent . to (subtract 1))
 
 consume :: TokenType -> Text -> StateT ParseState Lox Token
-consume tt msg = do
-  ifM (check tt) advance $ do
-    token <- peek
-    err <- lift $ createError token msg
-    liftIO . throwIO $ err
+consume tt msg = ifM (check tt) advance $ do
+  token <- peek
+  err <- lift $ createError token msg
+  liftIO . throwIO $ err
 
 createError :: Token -> Text -> Lox ParseError
 createError token msg = do
