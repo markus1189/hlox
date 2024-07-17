@@ -24,7 +24,7 @@ main = do
   args <- getArgs
   if length args > 1
     then do
-      putStrLn "Usage: jlox [script]"
+      putStrLn "Usage: hlox [script]"
       exitWith (ExitFailure 64)
     else
       flip runLox env $
