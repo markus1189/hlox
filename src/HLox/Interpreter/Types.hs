@@ -1,7 +1,8 @@
 module HLox.Interpreter.Types where
 
-import Data.Text (Text)
 import Control.Lens.TH (makePrisms)
+import Data.Text (Text)
+import HLox.Scanner.Types
 
 data LoxValue
   = LoxNil
@@ -11,3 +12,6 @@ data LoxValue
   deriving (Show, Eq, Ord)
 
 makePrisms ''LoxValue
+
+data InterpretError = InterpretError !Token !Text
+  deriving (Show)

@@ -6,7 +6,7 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TIO
 import HLox.Interpreter (interpret)
-import HLox.Parser (parse, pretty)
+import HLox.Parser (parse)
 import HLox.Scanner (scanTokens)
 import HLox.Types (Lox, makeLoxEnv, runLox)
 import HLox.Util
@@ -56,4 +56,10 @@ run script = do
   parseResult <- parse tokens
   case parseResult of
     Left _ -> pure ()
-    Right expr -> liftIO $ TIO.putStrLn $ Text.pack $ show $ interpret expr
+    Right expr -> do
+      let result = interpret expr
+      case result of
+        Left err ->
+          liftIO $ TIO.putStrLn $ Text.pack $ show err
+        Right val -> do
+          liftIO $ TIO.putStrLn $ Text.pack $ show val

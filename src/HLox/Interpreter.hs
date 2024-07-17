@@ -1,49 +1,51 @@
 module HLox.Interpreter (interpret) where
 
 import Control.Applicative ((<|>))
+import Control.Lens.Combinators (_Right)
 import Control.Lens.Operators ((^.), (^?))
-import Data.Maybe (fromMaybe)
+import Data.Either.Combinators (maybeToRight)
 import Data.Text qualified as Text
 import HLox.Interpreter.Types
 import HLox.Parser.Types (Expr (..))
 import HLox.Scanner.Types
 
-interpret :: Expr -> LoxValue
+interpret :: Expr -> Either InterpretError LoxValue
 --
-interpret (ExprLiteral LitNothing) = LoxNil
-interpret (ExprLiteral (LitText v)) = LoxText v
-interpret (ExprLiteral (LitNumber v)) = LoxNumber v
-interpret (ExprLiteral (LitBool v)) = LoxBool v
+interpret (ExprLiteral LitNothing) = Right LoxNil
+interpret (ExprLiteral (LitText v)) = Right $ LoxText v
+interpret (ExprLiteral (LitNumber v)) = Right $ LoxNumber v
+interpret (ExprLiteral (LitBool v)) = Right $ LoxBool v
 --
 interpret (ExprGrouping e) = interpret e
 --
 interpret (ExprUnary t e) = case t ^. tokenType of
-  BANG -> LoxBool $ not $ isTruthy right
-  MINUS -> case right of
-    LoxNumber n -> LoxNumber (negate n)
-    _ -> error "Unary minus on invalid value"
-  _ -> error "Unmatched case"
-  where
-    right = interpret e
+  BANG -> LoxBool . not . isTruthy <$> interpret e
+  MINUS -> do
+    right <- interpret e
+    case right of
+      LoxNumber n -> Right $ LoxNumber (negate n)
+      _ -> Left $ InterpretError t "Unary minus on invalid value"
+  _ -> Left $ InterpretError t "Unmatched case"
 --
 interpret (ExprBinary lhs op rhs) = case opType of
-  GREATER -> maybe (error "Invalid > operands") LoxBool ((>) <$> e1 ^? _LoxNumber <*> e2 ^? _LoxNumber)
-  GREATER_EQUAL -> maybe (error "Invalid >= operands") LoxBool ((>=) <$> e1 ^? _LoxNumber <*> e2 ^? _LoxNumber)
-  LESS -> maybe (error "Invalid < operands") LoxBool ((<) <$> e1 ^? _LoxNumber <*> e2 ^? _LoxNumber)
-  LESS_EQUAL -> maybe (error "Invalid <= operands") LoxBool ((<=) <$> e1 ^? _LoxNumber <*> e2 ^? _LoxNumber)
-  BANG_EQUAL -> LoxBool $ e1 /= e2
-  EQUAL_EQUAL -> LoxBool $ e1 == e2
+  GREATER -> maybeToRight (InterpretError op "Invalid operands") $ fmap LoxBool ((>) <$> e1 ^? _Right . _LoxNumber <*> e2 ^? _Right . _LoxNumber)
+  GREATER_EQUAL -> maybeToRight (InterpretError op "Invalid >= operands") $ fmap LoxBool ((>=) <$> e1 ^? _Right . _LoxNumber <*> e2 ^? _Right . _LoxNumber)
+  LESS -> maybeToRight (InterpretError op "Invalid < operands") $ fmap LoxBool ((<) <$> e1 ^? _Right . _LoxNumber <*> e2 ^? _Right . _LoxNumber)
+  LESS_EQUAL -> maybeToRight (InterpretError op "Invalid <= operands") $ fmap LoxBool ((<=) <$> e1 ^? _Right . _LoxNumber <*> e2 ^? _Right . _LoxNumber)
+  BANG_EQUAL -> LoxBool <$> ((/=) <$> e1 <*> e2)
+  EQUAL_EQUAL -> LoxBool <$> ((==) <$> e1 <*> e2)
   MINUS ->
-    maybe (error "Invalid minus operands") LoxNumber ((-) <$> e1 ^? _LoxNumber <*> e2 ^? _LoxNumber)
+    maybeToRight (InterpretError op "Invalid minus operands") $ fmap LoxNumber ((-) <$> e1 ^? _Right . _LoxNumber <*> e2 ^? _Right . _LoxNumber)
   SLASH ->
-    maybe (error "Invalid div operands") LoxNumber ((/) <$> e1 ^? _LoxNumber <*> e2 ^? _LoxNumber)
+    maybeToRight (InterpretError op "Invalid div operands") $ fmap LoxNumber ((/) <$> e1 ^? _Right . _LoxNumber <*> e2 ^? _Right . _LoxNumber)
   STAR ->
-    maybe (error "Invalid mult operands") LoxNumber ((*) <$> e1 ^? _LoxNumber <*> e2 ^? _LoxNumber)
+    maybeToRight (InterpretError op "Invalid mult operands") $ fmap LoxNumber ((*) <$> e1 ^? _Right . _LoxNumber <*> e2 ^? _Right . _LoxNumber)
   PLUS ->
-    fromMaybe (error "Invalid plus operands") $
-      let addNumbers = fmap LoxNumber $ (+) <$> e1 ^? _LoxNumber <*> e2 ^? _LoxNumber
-          addStrings = fmap LoxText $ Text.append <$> e1 ^? _LoxText <*> e2 ^? _LoxText
+    maybeToRight (InterpretError op "Invalid plus operands") $
+      let addNumbers = fmap LoxNumber $ (+) <$> e1 ^? _Right . _LoxNumber <*> e2 ^? _Right . _LoxNumber
+          addStrings = fmap LoxText $ Text.append <$> e1 ^? _Right . _LoxText <*> e2 ^? _Right . _LoxText
        in addNumbers <|> addStrings
+  _ -> Left (InterpretError op "Invalid operand case")
   where
     e1 = interpret lhs
     e2 = interpret rhs
