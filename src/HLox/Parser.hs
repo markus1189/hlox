@@ -48,6 +48,9 @@ instance Pretty Expr where
     where
       l = op ^. lexeme . _Lexeme
   pretty (ExprVariable t) = t ^. lexeme . _Lexeme
+  pretty (ExprAssign name v) = [i|(reassign #{name'}) #{pretty v}|]
+    where
+      name' = name ^. lexeme . _Lexeme
 
 instance Pretty [Stmt] where
   pretty stmts = [i|(sequence #{Text.intercalate " " (map pretty' stmts)})|]
@@ -101,7 +104,25 @@ parseExpressionStatement = do
   pure $ StmtExpr e
 
 parseExpression :: StateT ParseState Lox Expr
-parseExpression = parseEquality
+parseExpression = parseAssignment
+
+parseAssignment :: StateT ParseState Lox Expr
+parseAssignment = do
+  expr <- parseEquality
+
+  ifM
+    (match [EQUAL])
+    ( do
+        equals <- previous
+        value <- parseAssignment
+
+        case expr of
+          ExprVariable name -> pure $ ExprAssign name value
+          _ -> do
+            lift $ void $ createError equals "Invalid assignment target."
+            pure expr
+    )
+    (pure expr)
 
 parseEquality :: StateT ParseState Lox Expr
 parseEquality = parseBinary parseComparison [BANG_EQUAL, EQUAL_EQUAL]

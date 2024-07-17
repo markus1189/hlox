@@ -5,7 +5,8 @@ import Data.Text (Text)
 import HLox.Scanner.Types
 
 data Expr
-  = ExprBinary !Expr !Token !Expr
+  = ExprAssign !Token !Expr
+  | ExprBinary !Expr !Token !Expr
   | ExprGrouping !Expr
   | ExprLiteral !Literal
   | ExprUnary !Token !Expr

@@ -1,13 +1,12 @@
 module HLox.Interpreter (interpret, eval, evalPure) where
 
 import Control.Applicative ((<|>))
-import Control.Lens.Combinators (to, use, view, _Right)
+import Control.Lens.Combinators (to, use, _Right)
 import Control.Lens.Operators ((%=), (^.), (^?))
 import Control.Monad.Except (ExceptT (ExceptT), MonadError (throwError), runExceptT)
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.RWS (MonadReader)
-import Control.Monad.Reader (runReader)
-import Control.Monad.State (StateT, evalStateT, lift)
+import Control.Monad.RWS (MonadState)
+import Control.Monad.State (StateT, evalState, evalStateT, lift)
 import Data.Either.Combinators (maybeToRight)
 import Data.Foldable (for_)
 import Data.String.Interpolate (i)
@@ -32,16 +31,16 @@ evalPure stmts = evalStateT (traverse executePure stmts) envEmpty
     executePure :: Stmt -> StateT Environment (Either InterpretError) LoxStmtValue
     executePure (StmtExpr e) = do
       env <- use id
-      lift $ LoxStmtVoid <$ runReader (interpret e) env
+      lift $ LoxStmtVoid <$ evalState (interpret e) env
     executePure (StmtPrint e) = do
       env <- use id
-      lift $ LoxStmtPrint . stringify <$> runReader (interpret e) env
+      lift $ LoxStmtPrint . stringify <$> evalState (interpret e) env
     executePure (StmtVar name Nothing) = do
       id %= envDefine (name ^. lexeme . _Lexeme) LoxNil
       pure LoxStmtVoid
     executePure (StmtVar name (Just initializer)) = do
       env <- use id
-      v <- lift $ runReader (interpret initializer) env
+      v <- lift $ evalState (interpret initializer) env
       let name' = name ^. lexeme . _Lexeme
       id %= envDefine name' v
       pure LoxStmtVoid
@@ -50,7 +49,7 @@ execute :: LoxStmtValue -> IO ()
 execute LoxStmtVoid = pure ()
 execute (LoxStmtPrint t) = TIO.putStrLn t
 
-interpret :: (MonadReader Environment m) => Expr -> m (Either InterpretError LoxValue)
+interpret :: (MonadState Environment m) => Expr -> m (Either InterpretError LoxValue)
 --
 interpret (ExprLiteral LitNothing) = pure $ Right LoxNil
 interpret (ExprLiteral (LitText v)) = pure $ Right $ LoxText v
@@ -93,10 +92,19 @@ interpret (ExprBinary lhs op rhs) = do
     _ -> pure $ Left (InterpretError op "Invalid operand case")
   where
     opType = op ^. tokenType
+interpret (ExprAssign name value) = runExceptT $ do
+  let name' = name ^. lexeme . _Lexeme
+  v <- ExceptT (interpret value)
+  env <- use id
+  let r = envGet name' env
+  case r of
+    Nothing -> throwError (InterpretError name [i|Undefined variable '#{name'}'|])
+    Just _ -> id %= envDefine name' v
+  pure v
 --
 interpret (ExprVariable name) = do
   let name' = name ^. lexeme . _Lexeme
-  mv <- view $ to (envGet name')
+  mv <- use $ to (envGet name')
   case mv of
     Just v -> pure $ Right v
     Nothing -> pure $ Left (InterpretError name [i|Undefined variable '#{name'}'|])
