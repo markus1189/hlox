@@ -5,6 +5,7 @@ import Control.Monad.IO.Class (liftIO)
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TIO
+import HLox.Interpreter (interpret)
 import HLox.Parser (parse, pretty)
 import HLox.Scanner (scanTokens)
 import HLox.Types (Lox, makeLoxEnv, runLox)
@@ -55,4 +56,4 @@ run script = do
   parseResult <- parse tokens
   case parseResult of
     Left _ -> pure ()
-    Right expr -> liftIO $ TIO.putStrLn $ pretty expr
+    Right expr -> liftIO $ TIO.putStrLn $ Text.pack $ show $ interpret expr
