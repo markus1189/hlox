@@ -1,4 +1,4 @@
-module HLox.Interpreter (interpret, eval) where
+module HLox.Interpreter (interpret, eval, evalPure) where
 
 import Control.Applicative ((<|>))
 import Control.Lens.Combinators (to, use, view, _Right)
@@ -42,7 +42,8 @@ evalPure stmts = evalStateT (traverse executePure stmts) envEmpty
     executePure (StmtVar name (Just initializer)) = do
       env <- use id
       v <- lift $ runReader (interpret initializer) env
-      id %= envDefine (name ^. lexeme . _Lexeme) v
+      let name' = name ^. lexeme . _Lexeme
+      id %= envDefine name' v
       pure LoxStmtVoid
 
 execute :: LoxStmtValue -> IO ()
