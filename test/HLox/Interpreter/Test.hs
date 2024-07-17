@@ -1,5 +1,6 @@
 module HLox.Interpreter.Test where
 
+import Control.Monad.Reader (runReader)
 import Data.String.Interpolate (i)
 import Data.Text (Text)
 import HLox.Interpreter (interpret)
@@ -31,7 +32,8 @@ spec_interpreter = do
 
 interpret' :: Text -> IO (Either InterpretError LoxValue)
 interpret' input = do
-  env <- makeLoxEnv
-  let (tokens, _) = scanTokens input
-  Right result <- flip runLox env $ parseExpr tokens
-  pure $ interpret result
+  loxEnv <- makeLoxEnv
+  let env = envEmpty
+      (tokens, _) = scanTokens input
+  Right result <- flip runLox loxEnv $ parseExpr tokens
+  pure $ runReader (interpret result) env

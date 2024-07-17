@@ -59,22 +59,26 @@ spec_simpleAst = do
       it "should parse an expression" $ do
         let (tokens, _) = scanTokens "1 * 2 + 3 == 6"
         env <- makeLoxEnv
-        result <-
-          flip runLox env $
-            parseExpr tokens
+        result <- flip runLox env $ parseExpr tokens
         case result of
-          Left _ -> expectationFailure "Could not scan"
+          Left err -> expectationFailure [i|Could not parse the statement: #{err}|]
           Right expr -> pretty expr `shouldBe` "(== (+ (* 1 2) 3) 6)"
     describe "statements" $ do
       it "should parse a statement" $ do
         let (tokens, _) = scanTokens "print 42;"
         env <- makeLoxEnv
-        result <-
-          flip runLox env $
-            parse tokens
+        result <- flip runLox env $ parse tokens
         case result of
           Left err -> expectationFailure [i|Could not parse the statement: #{err}|]
           Right expr -> pretty expr `shouldBe` "(sequence (print 42))"
+    describe "variables" $ do
+      it "should parse variables" $ do
+        let (tokens, _) = scanTokens "var a = 1; var b = 2; print a + b;"
+        env <- makeLoxEnv
+        result <- flip runLox env $ parse tokens
+        case result of
+          Left err -> expectationFailure [i|Could not parse the statement: #{err}|]
+          Right expr -> pretty expr `shouldBe` "(sequence (assign a 1) (assign b 2) (print (+ a b)))"
 
 test_goldenParser :: TestTree
 test_goldenParser =

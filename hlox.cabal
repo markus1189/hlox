@@ -13,6 +13,25 @@ build-type:         Simple
 extra-doc-files:    CHANGELOG.md
 -- extra-source-files:
 
+common deps
+    build-depends:   containers
+                   , either
+                   , exceptions
+                   , extra
+                   , filepath
+                   , formatting
+                   , lens ^>=5.3.0
+                   , monad-loops
+                   , mtl
+                   , streaming
+                   , string-conversions
+                   , string-interpolate
+                   , text
+                   , transformers
+                   , unordered-containers
+                   , vector
+
+
 common options
     ghc-options: -Wall -threaded
     default-language: GHC2021
@@ -22,9 +41,11 @@ common options
                       , TupleSections
                       , ViewPatterns
                       , QuasiQuotes
+                      , LambdaCase
 
 library
     import:           options
+    import:           deps
     exposed-modules:  HLox
                     , HLox.Interpreter
                     , HLox.Interpreter.Types
@@ -69,6 +90,7 @@ executable hlox
 
 test-suite hlox-test
     import:           options
+    import:           deps
     default-language: GHC2021
     other-modules:    HLox.Interpreter.Test
                     , HLox.Parser.Test
@@ -80,16 +102,11 @@ test-suite hlox-test
     build-depends:     base ^>=4.18.2.1
                      , aeson
                      , aeson-pretty
-                     , filepath
                      , hlox
                      , hspec
-                     , lens
-                     , string-conversions
-                     , string-interpolate
                      , tasty
                      , tasty-discover
                      , tasty-golden
                      , tasty-hspec
-                     , text
     build-tool-depends: tasty-discover:tasty-discover
     other-modules:      HLox.Scanner.Test

@@ -41,3 +41,5 @@ envDefine name value = over _Environment $ Map.insert name value
 
 envGet :: Text -> Environment -> Maybe LoxValue
 envGet name = view (_Environment . at name)
+
+envEmpty = Environment Map.empty
