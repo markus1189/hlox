@@ -2,10 +2,12 @@ module HLox (main) where
 
 import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
+import Data.String.Conversions (convertString)
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TIO
 import HLox.Interpreter (interpret)
+import HLox.Interpreter.Types (stringify)
 import HLox.Parser (parse)
 import HLox.Scanner (scanTokens)
 import HLox.Types (Lox, makeLoxEnv, runLox)
@@ -41,7 +43,7 @@ runPrompt = do
   S.effects $
     S.mapM mapper $
       S.takeWhile (not . Text.isPrefixOf ":q") $
-        S.map Text.pack $
+        S.map convertString $
           S.stdinLn @Lox
   liftIO $ TIO.putStrLn "Goodbye"
   where
@@ -60,6 +62,6 @@ run script = do
       let result = interpret expr
       case result of
         Left err ->
-          liftIO $ TIO.putStrLn $ Text.pack $ show err
+          liftIO $ TIO.putStrLn $ convertString $ show err
         Right val -> do
-          liftIO $ TIO.putStrLn $ Text.pack $ show val
+          liftIO $ TIO.putStrLn $ stringify val

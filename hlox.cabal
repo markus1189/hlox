@@ -47,6 +47,7 @@ library
                     , monad-loops
                     , mtl
                     , streaming
+                    , string-conversions
                     , string-interpolate
                     , text
                     , transformers
