@@ -9,9 +9,14 @@ data Expr
   | ExprGrouping !Expr
   | ExprLiteral !Literal
   | ExprUnary !Token !Expr
+  | ExprVariable !Token
   deriving (Show, Eq, Ord)
 
-data Stmt = StmtExpr !Expr | StmtPrint !Expr deriving (Show, Eq, Ord)
+data Stmt
+  = StmtExpr !Expr
+  | StmtPrint !Expr
+  | StmtVar !Token !(Maybe Expr)
+  deriving (Show, Eq, Ord)
 
 data ParseError = ParseError !Token !Text deriving (Show, Eq)
 

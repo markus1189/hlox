@@ -5,13 +5,13 @@ import Control.Lens.Combinators (preview, to, use, view, _last)
 import Control.Lens.Operators ((+=), (^.))
 import Control.Lens.TH (makeLenses)
 import Control.Monad (void, when)
-import Control.Monad.Catch (try)
+import Control.Monad.Catch (catch, try)
 import Control.Monad.Extra (andM, findM, ifM, whenM)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Loops (unfoldrM, whileM, whileM_)
 import Control.Monad.Reader (lift)
 import Control.Monad.State (MonadState, StateT (runStateT))
-import Data.Maybe (fromMaybe, isJust)
+import Data.Maybe (catMaybes, fromMaybe, isJust)
 import Data.String.Interpolate (i)
 import Data.Text (Text)
 import Data.Text qualified as Text
@@ -47,24 +47,43 @@ instance Pretty Expr where
   pretty (ExprUnary op e) = [i|(#{l} #{pretty e})|]
     where
       l = op ^. lexeme . _Lexeme
+  pretty (ExprVariable t) = t ^. lexeme . _Lexeme
 
 instance Pretty [Stmt] where
   pretty stmts = [i|(sequence #{Text.intercalate " " (map pretty' stmts)})|]
     where
       pretty' (StmtExpr e) = pretty e
       pretty' (StmtPrint e) = [i|(print #{pretty e})|]
+      pretty' (StmtVar n e) = [i|(assign #{view (lexeme . _Lexeme) n } #{maybe "" pretty e})|]
 
 parseWith :: StateT ParseState Lox a -> [Token] -> Lox (Either ParseError a)
-parseWith p tokens = try $ (fst <$> (runStateT @_ @Lox) p (ParseState 0 (Vector.fromList tokens)))
+parseWith p tokens = try (fst <$> (runStateT @_ @Lox) p (ParseState 0 (Vector.fromList tokens)))
 
 parse :: [Token] -> Lox (Either ParseError [Stmt])
-parse = parseWith parseStatements
+parse = parseWith parseDeclarations
 
 parseExpr :: [Token] -> Lox (Either ParseError Expr)
 parseExpr = parseWith parseExpression
 
-parseStatements :: StateT ParseState Lox [Stmt]
-parseStatements = whileM (not <$> isAtEnd) parseStatement
+parseDeclarations :: StateT ParseState Lox [Stmt]
+parseDeclarations = catMaybes <$> whileM (not <$> isAtEnd) parseDeclaration
+
+parseDeclaration :: StateT ParseState Lox (Maybe Stmt)
+parseDeclaration =
+  ( Just
+      <$> ifM
+        (match [VAR])
+        parseVarDeclaration
+        parseStatement
+  )
+    `catch` \(ParseError _ _) -> Nothing <$ synchronize
+
+parseVarDeclaration :: StateT ParseState Lox Stmt
+parseVarDeclaration = do
+  name <- consume IDENTIFIER "Expect variable name."
+  initializer <- ifM (match [EQUAL]) (Just <$> parseExpression) (pure Nothing)
+  void $ consume SEMICOLON "Expect ';' after variable declaration."
+  pure $ StmtVar name initializer
 
 parseStatement :: StateT ParseState Lox Stmt
 parseStatement = ifM (match [PRINT]) parsePrintStatement parseExpressionStatement
@@ -116,6 +135,9 @@ parsePrimary = ifM (match [FALSE]) (pure $ ExprLiteral (LitBool False))
         n <- previous
         pure $ ExprLiteral (n ^. literal)
     )
+  $ ifM
+    (match [IDENTIFIER])
+    (ExprVariable <$> previous)
   $ ifM
     (match [LEFT_PAREN])
     ( do
