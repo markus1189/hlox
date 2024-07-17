@@ -2,14 +2,15 @@ module HLox (main) where
 
 import Control.Monad.Extra (whenM)
 import Control.Monad.IO.Class (liftIO)
+import Data.Foldable (for_)
 import Data.String.Conversions (convertString)
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TIO
-import HLox.Interpreter (interpret)
-import HLox.Interpreter.Types (stringify)
+import HLox.Interpreter (eval)
 import HLox.Parser (parse)
 import HLox.Scanner (scanTokens)
+import HLox.Scanner.Types (ScanError (..))
 import HLox.Types (Lox, makeLoxEnv, runLox)
 import HLox.Util
 import Streaming.Prelude qualified as S
@@ -55,13 +56,12 @@ runPrompt = do
 run :: Text -> Lox ()
 run script = do
   let (tokens, errs) = scanTokens script
-  parseResult <- parse tokens
-  case parseResult of
-    Left _ -> pure ()
-    Right expr -> do
-      let result = interpret expr
-      case result of
-        Left err -> do
-          loxRuntimeError err
-        Right val -> do
-          liftIO $ TIO.putStrLn $ stringify val
+  case errs of
+    [] -> do
+      parseResult <- parse tokens
+      case parseResult of
+        Left _ -> pure ()
+        Right stmts -> eval stmts
+    scanErrs -> do
+      liftIO $ TIO.putStrLn "There were scan errors:"
+      for_ scanErrs $ \(ScanError l msg) -> loxError l msg

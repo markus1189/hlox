@@ -4,7 +4,7 @@ import Data.String.Interpolate (i)
 import Data.Text (Text)
 import HLox.Interpreter (interpret)
 import HLox.Interpreter.Types
-import HLox.Parser (parse)
+import HLox.Parser (parseExpr)
 import HLox.Scanner (scanTokens)
 import HLox.Types
 import Test.Hspec (SpecWith, describe, it, shouldBe)
@@ -33,5 +33,5 @@ interpret' :: Text -> IO (Either InterpretError LoxValue)
 interpret' input = do
   env <- makeLoxEnv
   let (tokens, _) = scanTokens input
-  Right result <- flip runLox env $ parse tokens
+  Right result <- flip runLox env $ parseExpr tokens
   pure $ interpret result

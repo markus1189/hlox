@@ -5,6 +5,11 @@ import Data.Text (Text)
 import Formatting (sformat, shortest)
 import HLox.Scanner.Types
 
+data LoxStmtValue
+  = LoxStmtVoid
+  | LoxStmtPrint !Text
+  deriving (Show)
+
 data LoxValue
   = LoxNil
   | LoxText !Text

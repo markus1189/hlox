@@ -1,4 +1,4 @@
-module HLox.Parser (pretty, parse) where
+module HLox.Parser (pretty, parse, parseExpr) where
 
 import Control.Exception (throwIO)
 import Control.Lens.Combinators (preview, to, use, view, _last)
@@ -8,7 +8,7 @@ import Control.Monad (void, when)
 import Control.Monad.Catch (try)
 import Control.Monad.Extra (andM, findM, ifM, whenM)
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Loops (unfoldrM, whileM_)
+import Control.Monad.Loops (unfoldrM, whileM, whileM_)
 import Control.Monad.Reader (lift)
 import Control.Monad.State (MonadState, StateT (runStateT))
 import Data.Maybe (fromMaybe, isJust)
@@ -43,9 +43,31 @@ pretty (ExprUnary op e) = [i|(#{l} #{pretty e})|]
   where
     l = op ^. lexeme . _Lexeme
 
-parse :: [Token] -> Lox (Either ParseError Expr)
+parse :: [Token] -> Lox (Either ParseError [Stmt])
 parse tokens = try $ do
-  fst <$> runStateT @_ @Lox parseExpression (ParseState 0 (Vector.fromList tokens))
+  fmap fst $ flip (runStateT @_ @Lox) (ParseState 0 (Vector.fromList tokens)) $ do
+    whileM (not <$> isAtEnd) parseStatement
+
+parseExpr :: [Token] -> Lox (Either ParseError Expr)
+parseExpr tokens = try $ do
+  fmap fst $ flip (runStateT @_ @Lox) (ParseState 0 (Vector.fromList tokens)) $ do
+    parseExpression
+
+parseStatement :: StateT ParseState Lox Stmt
+parseStatement = do
+  ifM (match [PRINT]) parsePrintStatement parseExpressionStatement
+
+parsePrintStatement :: StateT ParseState Lox Stmt
+parsePrintStatement = do
+  e <- parseExpression
+  void $ consume SEMICOLON "Expect ';' after value."
+  pure $ StmtPrint e
+
+parseExpressionStatement :: StateT ParseState Lox Stmt
+parseExpressionStatement = do
+  e <- parseExpression
+  void $ consume SEMICOLON "Expect ';' after expression."
+  pure $ StmtExpr e
 
 parseExpression :: StateT ParseState Lox Expr
 parseExpression = parseEquality

@@ -2,7 +2,7 @@ module HLox.Parser.Test where
 
 import Data.String.Conversions (convertString)
 import Data.Text (Text)
-import HLox.Parser (parse, pretty)
+import HLox.Parser (parseExpr, pretty)
 import HLox.Parser.Types
 import HLox.Scanner (scanTokens)
 import HLox.Scanner.Types
@@ -16,7 +16,7 @@ testValidParser :: String -> Text -> TestTree
 testValidParser name input = goldenVsString name ("golden" </> "parser" </> name) $ do
   let (tokens, _) = scanTokens input
   env <- makeLoxEnv
-  Right result <- flip runLox env $ parse tokens
+  Right result <- flip runLox env $ parseExpr tokens
   pure $ convertString $ pretty result
 
 spec_simpleAst :: SpecWith ()
@@ -36,7 +36,7 @@ spec_simpleAst = do
       env <- makeLoxEnv
       result <-
         flip runLox env $
-          parse
+          parseExpr
             [ Token NUMBER (Lexeme "42") (LitNumber 42) (Line 1),
               Token EOF (Lexeme "") LitNothing (Line 1)
             ]
@@ -47,7 +47,7 @@ spec_simpleAst = do
       env <- makeLoxEnv
       result <-
         flip runLox env $
-          parse tokens
+          parseExpr tokens
       case result of
         Left _ -> expectationFailure "Could not scan"
         Right expr -> pretty expr `shouldBe` "(== (+ (* 1 2) 3) 6)"
@@ -57,5 +57,6 @@ test_goldenParser =
   testGroup
     "Golden Tests"
     [ testValidParser "arithmetic_equality" "1 * 2 + 3 == 6",
-      testValidParser "multi_equality" "1 == 2 == 3 == 4"
+      testValidParser "multi_equality" "1 == 2 == 3 == 4",
+      testValidParser "statements" "1 == 4; 1 > 3; true and false"
     ]

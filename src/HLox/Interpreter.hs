@@ -1,13 +1,36 @@
-module HLox.Interpreter (interpret) where
+module HLox.Interpreter (interpret, eval) where
 
 import Control.Applicative ((<|>))
 import Control.Lens.Combinators (to, _Right)
 import Control.Lens.Operators ((^.), (^?))
+import Control.Monad.IO.Class (liftIO)
 import Data.Either.Combinators (maybeToRight)
+import Data.Foldable (for_)
 import Data.Text qualified as Text
+import Data.Text.IO qualified as TIO
 import HLox.Interpreter.Types
-import HLox.Parser.Types (Expr (..))
+import HLox.Parser.Types (Expr (..), Stmt (..))
 import HLox.Scanner.Types
+import HLox.Types (Lox)
+import HLox.Util (loxRuntimeError)
+
+eval :: (Traversable t) => t Stmt -> Lox ()
+eval stmts = do
+  let r = evalPure stmts
+  case r of
+    Left err -> loxRuntimeError err
+    Right stmtValues -> liftIO $ for_ stmtValues execute
+
+evalPure :: (Traversable t) => t Stmt -> Either InterpretError (t LoxStmtValue)
+evalPure = traverse executePure
+  where
+    executePure :: Stmt -> Either InterpretError LoxStmtValue
+    executePure (StmtExpr e) = LoxStmtVoid <$ interpret e
+    executePure (StmtPrint e) = LoxStmtPrint . stringify <$> interpret e
+
+execute :: LoxStmtValue -> IO ()
+execute LoxStmtVoid = pure ()
+execute (LoxStmtPrint t) = TIO.putStrLn t
 
 interpret :: Expr -> Either InterpretError LoxValue
 --
