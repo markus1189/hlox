@@ -8,12 +8,13 @@ import Data.IORef (IORef, newIORef)
 
 data LoxEnv = LoxEnv
   { _hadError :: IORef Bool
+  , _hadRuntimeError :: IORef Bool
   }
 
 makeLenses ''LoxEnv
 
 makeLoxEnv :: IO LoxEnv
-makeLoxEnv = LoxEnv <$> newIORef False
+makeLoxEnv = LoxEnv <$> newIORef False <*> newIORef False
 
 newtype Lox a = Lox (ReaderT LoxEnv IO a)
   deriving

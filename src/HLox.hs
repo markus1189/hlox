@@ -1,6 +1,6 @@
 module HLox (main) where
 
-import Control.Monad (when)
+import Control.Monad.Extra (whenM)
 import Control.Monad.IO.Class (liftIO)
 import Data.String.Conversions (convertString)
 import Data.Text (Text)
@@ -35,8 +35,8 @@ runFile :: FilePath -> Lox ()
 runFile fp = do
   script <- liftIO $ TIO.readFile fp
   run script
-  err <- loxHadError
-  when err $ liftIO $ exitWith (ExitFailure 65)
+  whenM loxHadError $ liftIO $ exitWith (ExitFailure 65)
+  whenM loxHadRuntimeError $ liftIO $ exitWith (ExitFailure 70)
 
 runPrompt :: Lox ()
 runPrompt = do
@@ -61,7 +61,7 @@ run script = do
     Right expr -> do
       let result = interpret expr
       case result of
-        Left err ->
-          liftIO $ TIO.putStrLn $ convertString $ show err
+        Left err -> do
+          loxRuntimeError err
         Right val -> do
           liftIO $ TIO.putStrLn $ stringify val
