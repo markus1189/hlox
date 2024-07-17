@@ -51,64 +51,16 @@ parseExpression :: StateT ParseState Lox Expr
 parseExpression = parseEquality
 
 parseEquality :: StateT ParseState Lox Expr
-parseEquality = do
-  expr <- parseComparison
-  fromMaybe expr . preview _last <$> unfoldrM unfoldStep expr
-  where
-    unfoldStep e = do
-      matches <- match [BANG_EQUAL, EQUAL_EQUAL]
-      if matches
-        then do
-          operator <- previous
-          right <- parseComparison
-          let r = ExprBinary e operator right
-          pure $ Just (r, r)
-        else pure Nothing
+parseEquality = parseBinary parseComparison [BANG_EQUAL, EQUAL_EQUAL]
 
 parseComparison :: StateT ParseState Lox Expr
-parseComparison = do
-  expr <- parseTerm
-  fromMaybe expr . preview _last <$> unfoldrM unfoldStep expr
-  where
-    unfoldStep e = do
-      matches <- match [GREATER, GREATER_EQUAL, LESS, LESS_EQUAL]
-      if matches
-        then do
-          operator <- previous
-          right <- parseTerm
-          let r = ExprBinary e operator right
-          pure $ Just (r, r)
-        else pure Nothing
+parseComparison = parseBinary parseTerm [GREATER, GREATER_EQUAL, LESS, LESS_EQUAL]
 
 parseTerm :: StateT ParseState Lox Expr
-parseTerm = do
-  expr <- parseFactor
-  fromMaybe expr . preview _last <$> unfoldrM unfoldStep expr
-  where
-    unfoldStep e = do
-      matches <- match [MINUS, PLUS]
-      if matches
-        then do
-          operator <- previous
-          right <- parseFactor
-          let r = ExprBinary e operator right
-          pure $ Just (r, r)
-        else pure Nothing
+parseTerm = parseBinary parseFactor [MINUS, PLUS]
 
 parseFactor :: StateT ParseState Lox Expr
-parseFactor = do
-  expr <- parseUnary
-  fromMaybe expr . preview _last <$> unfoldrM unfoldStep expr
-  where
-    unfoldStep e = do
-      matches <- match [SLASH, STAR]
-      if matches
-        then do
-          operator <- previous
-          right <- parseUnary
-          let r = ExprBinary e operator right
-          pure $ Just (r, r)
-        else pure Nothing
+parseFactor = parseBinary parseUnary [SLASH, STAR]
 
 parseUnary :: StateT ParseState Lox Expr
 parseUnary = do
@@ -142,6 +94,21 @@ parsePrimary = do
       t <- peek
       err <- lift $ createError t "Expect expression."
       liftIO . throwIO $ err
+
+parseBinary :: (MonadState ParseState m) => m Expr -> [TokenType] -> m Expr
+parseBinary p ts = do
+  expr <- p
+  fromMaybe expr . preview _last <$> unfoldrM unfoldStep expr
+  where
+    unfoldStep e = do
+      matches <- match ts
+      if matches
+        then do
+          operator <- previous
+          right <- p
+          let r = ExprBinary e operator right
+          pure $ Just (r, r)
+        else pure Nothing
 
 match :: (MonadState ParseState m) => [TokenType] -> m Bool
 match types =
