@@ -1,6 +1,6 @@
 build: format
     #!/usr/bin/env bash
-    cabal build
+    cabal build --enable-tests
 
 test: format
     #!/usr/bin/env bash
