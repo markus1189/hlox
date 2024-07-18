@@ -2,6 +2,22 @@ build: format
     #!/usr/bin/env bash
     cabal build --enable-tests
 
+buildloop:
+    #!/usr/bin/env bash
+    find . -name '*.hs' \! -ipath '*/build/*' | entr -r -c just buildloop_step
+
+buildloop_step:
+    #!/usr/bin/env bash
+    cabal build --enable-tests
+
+    if [[ $? == "0" ]]; then
+      notify-send -u low "HLox" "Success"
+      figlet -f doom 'SUCCESS' | tte --anchor-canvas c --anchor-text c beams
+    else
+      notify-send -u critical "HLox" "Failed"
+      figlet -f doom 'FAILED' | tte --anchor-canvas c --anchor-text c decrypt
+    fi
+
 test: format
     #!/usr/bin/env bash
     cabal test
