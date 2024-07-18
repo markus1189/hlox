@@ -1,5 +1,6 @@
 module HLox.Interpreter.Test where
 
+import Control.Monad.Except (runExcept)
 import Control.Monad.State (evalStateT)
 import Data.String.Interpolate (i)
 import Data.Text (Text)
@@ -9,7 +10,6 @@ import HLox.Parser (parse, parseExpr)
 import HLox.Scanner (scanTokens)
 import HLox.Types
 import Test.Hspec (SpecWith, describe, it, shouldBe)
-import Control.Monad.Except (runExcept)
 
 spec_interpreterExpr :: SpecWith ()
 spec_interpreterExpr = do
@@ -43,15 +43,14 @@ spec_interpreterStmt = do
         result `shouldBe` [LoxStmtVoid, LoxStmtVoid, LoxStmtVoid, LoxStmtPrint "4"]
       it "should handle block expressions" $ do
         Right result <- interpretStmt' "var a = 1; { a = 2; var b = 3; print a + b; }; print a;"
-        result `shouldBe` [LoxStmtVoid,LoxStmtBlock [LoxStmtVoid,LoxStmtVoid,LoxStmtPrint "5"],LoxStmtPrint "1"]
+        result `shouldBe` [LoxStmtVoid, LoxStmtBlock [LoxStmtVoid, LoxStmtVoid, LoxStmtPrint "5"], LoxStmtPrint "1"]
 
 interpretExpr' :: Text -> IO (Either InterpretError LoxValue)
 interpretExpr' input = do
   loxEnv <- makeLoxEnv
-  let env = envEmpty
-      (tokens, _) = scanTokens input
+  let (tokens, _) = scanTokens input
   Right result <- flip runLox loxEnv $ parseExpr tokens
-  pure $ runExcept $ evalStateT (interpret result) env
+  pure $ runExcept $ evalStateT (interpret result) mempty
 
 interpretStmt' :: Text -> IO (Either InterpretError [LoxStmtValue])
 interpretStmt' input = do

@@ -57,8 +57,8 @@ scanTokens script = over _2 (view ssErrors) $ flip runState (ScanState 0 0 (Line
     current <- use ssCurrent
     ssStart .= current
     scanToken
-  line <- use ssLine
-  ssTokens %= (++ [Token EOF (Lexeme "") LitNothing line])
+  line' <- use ssLine
+  ssTokens %= (++ [Token EOF (Lexeme "") LitNothing line'])
   use ssTokens
 
 scanToken :: State ScanState ()
@@ -129,6 +129,7 @@ scanNumber = do
   addToken (LitNumber $ unsafeFromRight $ Text.double value) NUMBER
   where
     unsafeFromRight (Right (x, _)) = x
+    unsafeFromRight _ = error "unsafeFromRight"
 
 scanIdentifier :: (MonadState ScanState m) => m ()
 scanIdentifier = do
@@ -160,8 +161,8 @@ addToken lit t = do
   start <- use ssStart
   current <- use ssCurrent
   let text = Lexeme $ slice start current source
-  line <- use ssLine
-  ssTokens |>= Token t text lit line
+  line' <- use ssLine
+  ssTokens |>= Token t text lit line'
 
 slice :: Int -> Int -> Text -> Text
 slice start end = Text.take (end - start) . Text.drop start

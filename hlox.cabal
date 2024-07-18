@@ -42,6 +42,7 @@ common options
                       , ViewPatterns
                       , QuasiQuotes
                       , LambdaCase
+                      , TypeFamilies
 
 library
     import:           options

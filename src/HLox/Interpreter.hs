@@ -1,8 +1,9 @@
 module HLox.Interpreter (interpret, eval, evalPure) where
 
 import Control.Applicative ((<|>))
+import Control.Lens (at)
 import Control.Lens.Combinators (to, use)
-import Control.Lens.Operators ((%=), (^.), (^?), (.=))
+import Control.Lens.Operators ((.=), (?=), (^.), (^?))
 import Control.Monad.Error.Class (liftEither)
 import Control.Monad.Except (MonadError (throwError))
 import Control.Monad.IO.Class (liftIO)
@@ -27,7 +28,7 @@ eval stmts = do
     Right stmtValues -> liftIO $ for_ stmtValues execute
 
 evalPure :: (Traversable t) => t Stmt -> Either InterpretError (t LoxStmtValue)
-evalPure stmts = evalStateT (traverse executePure stmts) envEmpty
+evalPure stmts = evalStateT (traverse executePure stmts) mempty
   where
     executePure :: Stmt -> StateT Environment (Either InterpretError) LoxStmtValue
     executePure (StmtExpr e) = LoxStmtVoid <$ interpret e
@@ -35,12 +36,12 @@ evalPure stmts = evalStateT (traverse executePure stmts) envEmpty
       x <- interpret e
       pure $ LoxStmtPrint $ stringify x
     executePure (StmtVar name Nothing) = do
-      id %= envDefine (name ^. lexeme . _Lexeme) LoxNil
+      at (name ^. lexeme . _Lexeme) ?= LoxNil
       pure LoxStmtVoid
     executePure (StmtVar name (Just initializer)) = do
       v <- interpret initializer
       let name' = name ^. lexeme . _Lexeme
-      id %= envDefine name' v
+      at name' ?= v
       pure LoxStmtVoid
     executePure (StmtBlock stmts') = do
       env <- use id
@@ -100,16 +101,15 @@ interpret (ExprBinary lhs op rhs) = do
 interpret (ExprAssign name value) = do
   let name' = name ^. lexeme . _Lexeme
   v <- interpret value
-  env <- use id
-  let r = envGet name' env
+  r <- use (at name')
   case r of
     Nothing -> throwError (InterpretError name [i|Undefined variable '#{name'}'|])
-    Just _ -> id %= envDefine name' v
+    Just _ -> at name' ?= v
   pure v
 --
 interpret (ExprVariable name) = do
   let name' = name ^. lexeme . _Lexeme
-  mv <- use $ to (envGet name')
+  mv <- use $ at name'
   case mv of
     Just v -> pure v
     Nothing -> throwError $ InterpretError name [i|Undefined variable '#{name'}'|]

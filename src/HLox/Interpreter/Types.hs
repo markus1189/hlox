@@ -1,9 +1,9 @@
 module HLox.Interpreter.Types where
 
-import Control.Lens.Combinators (at, over, view)
+import Control.Lens (At, Index, IxValue, Lens', Traversal', ix)
+import Control.Lens.Combinators (Ixed, at)
 import Control.Lens.TH (makePrisms)
 import Data.Map.Strict (Map)
-import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Formatting (sformat, shortest)
 import HLox.Scanner.Types
@@ -33,14 +33,18 @@ stringify (LoxBool False) = "false"
 data InterpretError = InterpretError !Token !Text
   deriving (Show)
 
-newtype Environment = Environment (Map Text LoxValue) deriving (Show)
+newtype Environment = Environment (Map Text LoxValue) deriving (Show, Eq, Ord, Semigroup, Monoid)
 
 makePrisms ''Environment
 
-envDefine :: Text -> LoxValue -> Environment -> Environment
-envDefine name value = over _Environment $ Map.insert name value
+type instance IxValue Environment = LoxValue
 
-envGet :: Text -> Environment -> Maybe LoxValue
-envGet name = view (_Environment . at name)
+type instance Index Environment = Text
 
-envEmpty = Environment Map.empty
+instance Ixed Environment where
+  ix :: Index Environment -> Traversal' Environment (IxValue Environment)
+  ix name = _Environment . ix name
+
+instance At Environment where
+  at :: Index Environment -> Lens' Environment (Maybe (IxValue Environment))
+  at name = _Environment . at name
