@@ -73,10 +73,20 @@ spec_simpleAst = do
           Left err -> expectationFailure [i|Could not parse the statement: #{err}|]
           Right expr -> pretty expr `shouldBe` "(sequence (assign a 1) (assign b 2) (print (+ a b)))"
       it "should parse blocks" $ do
-        result <- parse' "{ var a = 1; print a; }"
+        result <- parse' "{ var a = 1; print a; };"
         case result of
           Left err -> expectationFailure [i|Could not parse the statement: #{err}|]
           Right expr -> pretty expr `shouldBe` "(sequence (block (assign a 1) (print a)))"
+      it "should parse blocks (2)" $ do
+        result <- parse' "var outer = true; { var a = 1; print a; }; print outer;"
+        case result of
+          Left err -> expectationFailure [i|Could not parse the statement: #{err}|]
+          Right expr -> pretty expr `shouldBe` "(sequence (assign outer True) (block (assign a 1) (print a)) (print outer))"
+      it "should parse empty blocks" $ do
+        result <- parse' "{}; print 1;"
+        case result of
+          Left err -> expectationFailure [i|Could not parse the statement: #{err}|]
+          Right expr -> pretty expr `shouldBe` "(sequence (block ) (print 1))"
 
 test_goldenParser :: TestTree
 test_goldenParser =

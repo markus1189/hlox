@@ -41,6 +41,9 @@ spec_interpreterStmt = do
       it "should handle re-assignments" $ do
         Right result <- interpretStmt' "var a = 1; var b = 2; a = 2; print a + b;"
         result `shouldBe` [LoxStmtVoid, LoxStmtVoid, LoxStmtVoid, LoxStmtPrint "4"]
+      it "should handle block expressions" $ do
+        Right result <- interpretStmt' "var a = 1; { a = 2; var b = 3; print a + b; }; print a;"
+        result `shouldBe` [LoxStmtVoid,LoxStmtBlock [LoxStmtVoid,LoxStmtVoid,LoxStmtPrint "5"],LoxStmtPrint "1"]
 
 interpretExpr' :: Text -> IO (Either InterpretError LoxValue)
 interpretExpr' input = do

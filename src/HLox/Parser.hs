@@ -90,8 +90,9 @@ parseVarDeclaration = do
   pure $ StmtVar name initializer
 
 parseStatement :: StateT ParseState Lox Stmt
-parseStatement = ifM (match [PRINT]) parsePrintStatement $
-  ifM (match [LEFT_BRACE]) (StmtBlock <$> parseBlock) parseExpressionStatement
+parseStatement = do
+  ifM (match [PRINT]) parsePrintStatement $
+    ifM (match [LEFT_BRACE]) (StmtBlock <$> parseBlock) parseExpressionStatement
 
 parsePrintStatement :: StateT ParseState Lox Stmt
 parsePrintStatement = do
@@ -103,6 +104,7 @@ parseBlock :: StateT ParseState Lox [Stmt]
 parseBlock = do
   stmts <- catMaybes <$> whileM ((&&) <$> (not <$> check RIGHT_BRACE) <*> (not <$> isAtEnd)) parseDeclaration
   void $ consume RIGHT_BRACE "Expect '}' after block."
+  void $ consume SEMICOLON "Expect ';' after block."
   pure stmts
 
 parseExpressionStatement :: StateT ParseState Lox Stmt

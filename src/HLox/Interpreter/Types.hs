@@ -11,6 +11,7 @@ import HLox.Scanner.Types
 data LoxStmtValue
   = LoxStmtVoid
   | LoxStmtPrint !Text
+  | LoxStmtBlock ![LoxStmtValue]
   deriving (Show, Eq, Ord)
 
 data LoxValue

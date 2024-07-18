@@ -2,14 +2,14 @@ module HLox.Interpreter (interpret, eval, evalPure) where
 
 import Control.Applicative ((<|>))
 import Control.Lens.Combinators (to, use)
-import Control.Lens.Operators ((%=), (^.), (^?))
+import Control.Lens.Operators ((%=), (^.), (^?), (.=))
 import Control.Monad.Error.Class (liftEither)
 import Control.Monad.Except (MonadError (throwError))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.RWS (MonadState)
 import Control.Monad.State (StateT, evalStateT)
 import Data.Either.Combinators (maybeToRight)
-import Data.Foldable (for_)
+import Data.Foldable (for_, traverse_)
 import Data.String.Interpolate (i)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TIO
@@ -42,10 +42,16 @@ evalPure stmts = evalStateT (traverse executePure stmts) envEmpty
       let name' = name ^. lexeme . _Lexeme
       id %= envDefine name' v
       pure LoxStmtVoid
+    executePure (StmtBlock stmts') = do
+      env <- use id
+      xs <- traverse executePure stmts'
+      id .= env
+      pure (LoxStmtBlock xs)
 
 execute :: LoxStmtValue -> IO ()
 execute LoxStmtVoid = pure ()
 execute (LoxStmtPrint t) = TIO.putStrLn t
+execute (LoxStmtBlock vs) = traverse_ execute vs
 
 interpret :: (MonadState Environment m, MonadError InterpretError m) => Expr -> m LoxValue
 --
