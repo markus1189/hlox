@@ -4,7 +4,7 @@ build: format
 
 buildloop:
     #!/usr/bin/env bash
-    find . -name '*.hs' \! -ipath '*/build/*' | entr -r -c just buildloop_step
+    find . -name '*.hs' -or -name '*.cabal' -or -name "justfile" \! -ipath '*/build/*' | entr -r -c just buildloop_step
 
 buildloop_step:
     #!/usr/bin/env bash
