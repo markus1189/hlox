@@ -58,6 +58,7 @@ instance Pretty [Stmt] where
       pretty' (StmtExpr e) = pretty e
       pretty' (StmtPrint e) = [i|(print #{pretty e})|]
       pretty' (StmtVar n e) = [i|(assign #{view (lexeme . _Lexeme) n } #{maybe "" pretty e})|]
+      pretty' (StmtBlock stmts') = [i|(block #{Text.unwords $ map pretty' stmts'})|]
 
 parseWith :: StateT ParseState Lox a -> [Token] -> Lox (Either ParseError a)
 parseWith p tokens = try (fst <$> (runStateT @_ @Lox) p (ParseState 0 (Vector.fromList tokens)))
@@ -89,13 +90,20 @@ parseVarDeclaration = do
   pure $ StmtVar name initializer
 
 parseStatement :: StateT ParseState Lox Stmt
-parseStatement = ifM (match [PRINT]) parsePrintStatement parseExpressionStatement
+parseStatement = ifM (match [PRINT]) parsePrintStatement $
+  ifM (match [LEFT_BRACE]) (StmtBlock <$> parseBlock) parseExpressionStatement
 
 parsePrintStatement :: StateT ParseState Lox Stmt
 parsePrintStatement = do
   e <- parseExpression
   void $ consume SEMICOLON "Expect ';' after value."
   pure $ StmtPrint e
+
+parseBlock :: StateT ParseState Lox [Stmt]
+parseBlock = do
+  stmts <- catMaybes <$> whileM ((&&) <$> (not <$> check RIGHT_BRACE) <*> (not <$> isAtEnd)) parseDeclaration
+  void $ consume RIGHT_BRACE "Expect '}' after block."
+  pure stmts
 
 parseExpressionStatement :: StateT ParseState Lox Stmt
 parseExpressionStatement = do

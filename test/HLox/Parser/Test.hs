@@ -8,7 +8,7 @@ import HLox.Parser (parse, parseExpr, pretty)
 import HLox.Parser.Types
 import HLox.Scanner (scanTokens)
 import HLox.Scanner.Types
-import HLox.Types (makeLoxEnv, runLox)
+import HLox.Types (Lox, makeLoxEnv, runLox)
 import System.FilePath ((</>))
 import Test.Hspec (SpecWith, describe, expectationFailure, it, shouldBe)
 import Test.Tasty (TestTree, testGroup)
@@ -57,28 +57,26 @@ spec_simpleAst = do
         result `shouldBe` Right (ExprLiteral (LitNumber 42))
 
       it "should parse an expression" $ do
-        let (tokens, _) = scanTokens "1 * 2 + 3 == 6"
-        env <- makeLoxEnv
-        result <- flip runLox env $ parseExpr tokens
+        result <- parseExpr' "1 * 2 + 3 == 6"
         case result of
           Left err -> expectationFailure [i|Could not parse the statement: #{err}|]
           Right expr -> pretty expr `shouldBe` "(== (+ (* 1 2) 3) 6)"
     describe "statements" $ do
       it "should parse a statement" $ do
-        let (tokens, _) = scanTokens "print 42;"
-        env <- makeLoxEnv
-        result <- flip runLox env $ parse tokens
+        result <- parse' "print 42;"
         case result of
           Left err -> expectationFailure [i|Could not parse the statement: #{err}|]
           Right expr -> pretty expr `shouldBe` "(sequence (print 42))"
-    describe "variables" $ do
       it "should parse variables" $ do
-        let (tokens, _) = scanTokens "var a = 1; var b = 2; print a + b;"
-        env <- makeLoxEnv
-        result <- flip runLox env $ parse tokens
+        result <- parse' "var a = 1; var b = 2; print a + b;"
         case result of
           Left err -> expectationFailure [i|Could not parse the statement: #{err}|]
           Right expr -> pretty expr `shouldBe` "(sequence (assign a 1) (assign b 2) (print (+ a b)))"
+      it "should parse blocks" $ do
+        result <- parse' "{ var a = 1; print a; }"
+        case result of
+          Left err -> expectationFailure [i|Could not parse the statement: #{err}|]
+          Right expr -> pretty expr `shouldBe` "(sequence (block (assign a 1) (print a)))"
 
 test_goldenParser :: TestTree
 test_goldenParser =
@@ -88,3 +86,15 @@ test_goldenParser =
       testValidParserExpr "multi_equality" "1 == 2 == 3 == 4",
       testValidParser "statements" "1 == 4; 1 > 3;"
     ]
+
+parseExpr' :: Text -> IO (Either ParseError Expr)
+parseExpr' = parseWith parseExpr
+
+parse' :: Text -> IO (Either ParseError [Stmt])
+parse' = parseWith parse
+
+parseWith :: ([Token] -> Lox b) -> Text -> IO b
+parseWith p input = do
+  let (tokens, []) = scanTokens input
+  env <- makeLoxEnv
+  flip runLox env $ p tokens

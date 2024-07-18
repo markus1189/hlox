@@ -17,6 +17,7 @@ data Stmt
   = StmtExpr !Expr
   | StmtPrint !Expr
   | StmtVar !Token !(Maybe Expr)
+  | StmtBlock ![Stmt]
   deriving (Show, Eq, Ord)
 
 data ParseError = ParseError !Token !Text deriving (Show, Eq)
