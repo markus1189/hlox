@@ -33,7 +33,7 @@ common deps
 
 
 common options
-    ghc-options: -Wall -threaded
+    ghc-options: -Wall -threaded -Werror=incomplete-patterns
     default-language: GHC2021
     default-extensions: LambdaCase
                       , OverloadedStrings
