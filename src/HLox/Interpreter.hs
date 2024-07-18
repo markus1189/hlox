@@ -69,19 +69,17 @@ interpret (ExprBinary lhs op rhs) = do
   e1 <- interpret lhs
   e2 <- interpret rhs
   case opType of
-    GREATER ->
-      liftEither $ maybeToRight (InterpretError op "Invalid operands") $ fmap LoxBool ((>) <$> e1 ^? _LoxNumber <*> e2 ^? _LoxNumber)
-    GREATER_EQUAL -> liftEither $ maybeToRight (InterpretError op "Invalid >= operands") $ fmap LoxBool ((>=) <$> e1 ^? _LoxNumber <*> e2 ^? _LoxNumber)
-    LESS -> liftEither $ maybeToRight (InterpretError op "Invalid < operands") $ fmap LoxBool ((<) <$> e1 ^? _LoxNumber <*> e2 ^? _LoxNumber)
-    LESS_EQUAL -> liftEither $ maybeToRight (InterpretError op "Invalid <= operands") $ fmap LoxBool ((<=) <$> e1 ^? _LoxNumber <*> e2 ^? _LoxNumber)
     BANG_EQUAL -> pure $ LoxBool $ e1 /= e2
     EQUAL_EQUAL -> pure $ LoxBool $ e1 == e2
-    MINUS ->
-      liftEither $ maybeToRight (InterpretError op "Invalid minus operands") $ fmap LoxNumber ((-) <$> e1 ^? _LoxNumber <*> e2 ^? _LoxNumber)
-    SLASH ->
-      liftEither $ maybeToRight (InterpretError op "Invalid div operands") $ fmap LoxNumber ((/) <$> e1 ^? _LoxNumber <*> e2 ^? _LoxNumber)
-    STAR ->
-      liftEither $ maybeToRight (InterpretError op "Invalid mult operands") $ fmap LoxNumber ((*) <$> e1 ^? _LoxNumber <*> e2 ^? _LoxNumber)
+    --
+    GREATER -> applyBinaryBool (>) e1 e2 "Invalid > operands"
+    GREATER_EQUAL -> applyBinaryBool (>=) e1 e2 "Invalid >= operands"
+    LESS -> applyBinaryBool (<) e1 e2 "Invalid < operands"
+    LESS_EQUAL -> applyBinaryBool (<=) e1 e2 "Invalid <= operands"
+    --
+    MINUS -> applyBinaryNumber (-) e1 e2 "Invalid minus operands"
+    SLASH -> applyBinaryNumber (/) e1 e2 "Invalid div operands"
+    STAR -> applyBinaryNumber (*) e1 e2 "Invalid mult operands"
     PLUS ->
       liftEither $
         maybeToRight (InterpretError op "Invalid plus operands") $
@@ -91,6 +89,8 @@ interpret (ExprBinary lhs op rhs) = do
     _ -> throwError (InterpretError op "Invalid operand case")
   where
     opType = op ^. tokenType
+    applyBinaryNumber f e1 e2 msg = liftEither $ maybeToRight (InterpretError op msg) $ fmap LoxNumber (f <$> e1 ^? _LoxNumber <*> e2 ^? _LoxNumber)
+    applyBinaryBool f e1 e2 msg = liftEither $ maybeToRight (InterpretError op msg) $ fmap LoxBool (f <$> e1 ^? _LoxNumber <*> e2 ^? _LoxNumber)
 interpret (ExprAssign name value) = do
   let name' = name ^. lexeme . _Lexeme
   v <- interpret value
