@@ -11,11 +11,21 @@ buildloop_step:
     cabal build --enable-tests
 
     if [[ $? == "0" ]]; then
-      notify-send -u low "HLox" "Success"
-      figlet -f doom 'SUCCESS' | tte --anchor-canvas c --anchor-text c beams
+      notify-send -u low "HLox" "Build Ok"
+
+      cabal test
+      if [[ $? == "0" ]]; then
+
+        notify-send -u low "HLox" "Tests Green"
+        figlet -f doom 'SUCCESS' | tte --anchor-canvas c --anchor-text c beams
+      else
+        notify-send -u critical "HLox" "Tests Failed"
+        figlet -f doom 'TEST FAIL' | tte --anchor-canvas c --anchor-text c decrypt
+
+      fi
     else
-      notify-send -u critical "HLox" "Failed"
-      figlet -f doom 'FAILED' | tte --anchor-canvas c --anchor-text c decrypt
+      notify-send -u critical "HLox" "Build Failed"
+      figlet -f doom 'BUILD FAIL' | tte --anchor-canvas c --anchor-text c decrypt
     fi
 
 test: format
