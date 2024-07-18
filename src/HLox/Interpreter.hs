@@ -6,7 +6,7 @@ import Control.Lens.Operators ((%=), (^.), (^?))
 import Control.Monad.Except (ExceptT (ExceptT), MonadError (throwError), runExceptT)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.RWS (MonadState)
-import Control.Monad.State (StateT, evalState, evalStateT, lift)
+import Control.Monad.State (StateT, evalStateT, lift)
 import Data.Either.Combinators (maybeToRight)
 import Data.Foldable (for_)
 import Data.String.Interpolate (i)
@@ -29,21 +29,20 @@ evalPure :: (Traversable t) => t Stmt -> Either InterpretError (t LoxStmtValue)
 evalPure stmts = evalStateT (traverse executePure stmts) envEmpty
   where
     executePure :: Stmt -> StateT Environment (Either InterpretError) LoxStmtValue
-    executePure (StmtExpr e) = do
-      env <- use id
-      lift $ LoxStmtVoid <$ evalState (interpret e) env
+    executePure (StmtExpr e) = LoxStmtVoid <$ interpret e
     executePure (StmtPrint e) = do
-      env <- use id
-      lift $ LoxStmtPrint . stringify <$> evalState (interpret e) env
+      x <- interpret e
+      lift $ LoxStmtPrint . stringify <$> x
     executePure (StmtVar name Nothing) = do
       id %= envDefine (name ^. lexeme . _Lexeme) LoxNil
       pure LoxStmtVoid
     executePure (StmtVar name (Just initializer)) = do
-      env <- use id
-      v <- lift $ evalState (interpret initializer) env
-      let name' = name ^. lexeme . _Lexeme
-      id %= envDefine name' v
-      pure LoxStmtVoid
+      x <- runExceptT @_ $ do
+        v <- ExceptT $ interpret initializer
+        let name' = name ^. lexeme . _Lexeme
+        id %= envDefine name' v
+        pure LoxStmtVoid
+      lift x
 
 execute :: LoxStmtValue -> IO ()
 execute LoxStmtVoid = pure ()
