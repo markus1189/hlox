@@ -6,6 +6,7 @@ import Control.Lens.TH (makePrisms)
 import Data.Map.Strict (Map)
 import Data.Text (Text)
 import Formatting (sformat, shortest)
+import HLox.Pretty (Pretty, pretty)
 import HLox.Scanner.Types
 
 data LoxStmtValue
@@ -22,6 +23,9 @@ data LoxValue
   deriving (Show, Eq, Ord)
 
 makePrisms ''LoxValue
+
+instance Pretty LoxValue where
+  pretty = stringify
 
 stringify :: LoxValue -> Text
 stringify LoxNil = "nil"

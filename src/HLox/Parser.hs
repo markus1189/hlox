@@ -14,11 +14,10 @@ import Control.Monad.State (MonadState, StateT (runStateT))
 import Data.Maybe (catMaybes, fromMaybe, isJust)
 import Data.String.Interpolate (i)
 import Data.Text (Text)
-import Data.Text qualified as Text
 import Data.Vector (Vector, (!))
 import Data.Vector qualified as Vector
-import Formatting (build, sformat, shortest)
 import HLox.Parser.Types
+import HLox.Pretty (Pretty, pretty)
 import HLox.Scanner.Types
 import HLox.Types (Lox)
 import HLox.Util (loxReport)
@@ -30,35 +29,6 @@ data ParseState = ParseState
   deriving (Show)
 
 makeLenses ''ParseState
-
-class Pretty a where
-  pretty :: a -> Text
-
-instance Pretty Expr where
-  pretty :: Expr -> Text
-  pretty (ExprBinary lhs op rhs) = [i|(#{l} #{pretty lhs} #{pretty rhs})|]
-    where
-      l = op ^. lexeme . _Lexeme
-  pretty (ExprGrouping e) = [i|(group #{pretty e})|]
-  pretty (ExprLiteral LitNothing) = "nil"
-  pretty (ExprLiteral (LitText txt)) = txt
-  pretty (ExprLiteral (LitNumber num)) = sformat shortest num
-  pretty (ExprLiteral (LitBool b)) = sformat build b
-  pretty (ExprUnary op e) = [i|(#{l} #{pretty e})|]
-    where
-      l = op ^. lexeme . _Lexeme
-  pretty (ExprVariable t) = t ^. lexeme . _Lexeme
-  pretty (ExprAssign name v) = [i|(reassign #{name'}) #{pretty v}|]
-    where
-      name' = name ^. lexeme . _Lexeme
-
-instance Pretty [Stmt] where
-  pretty stmts = [i|(sequence #{Text.intercalate " " (map pretty' stmts)})|]
-    where
-      pretty' (StmtExpr e) = pretty e
-      pretty' (StmtPrint e) = [i|(print #{pretty e})|]
-      pretty' (StmtVar n e) = [i|(assign #{view (lexeme . _Lexeme) n } #{maybe "" pretty e})|]
-      pretty' (StmtBlock stmts') = [i|(block #{Text.unwords $ map pretty' stmts'})|]
 
 parseWith :: StateT ParseState Lox a -> [Token] -> Lox (Either ParseError a)
 parseWith p tokens = try (fst <$> (runStateT @_ @Lox) p (ParseState 0 (Vector.fromList tokens)))

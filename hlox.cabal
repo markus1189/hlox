@@ -52,6 +52,7 @@ library
                     , HLox.Interpreter.Types
                     , HLox.Parser
                     , HLox.Parser.Types
+                    , HLox.Pretty
                     , HLox.Scanner
                     , HLox.Scanner.Types
                     , HLox.Types
