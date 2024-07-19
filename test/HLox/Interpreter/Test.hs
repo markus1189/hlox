@@ -62,11 +62,21 @@ spec_interpreterStmt = do
       it "should handle if statements without else" $ do
         result <- interpretStmt' "if (true) { print 1; }"
         result `shouldBe` Right [LoxStmtBlock [LoxStmtPrint "1"]]
-
--- it "should handle while statements" $ do
---   let program = "var x = 0; while (x < 5) { print x; x = x + 1; } print x;"
---   Right result <- interpretStmt' program
---   result `shouldBe` [LoxStmtBlock [LoxStmtPrint "1"]]
+      it "should handle while statements" $ do
+        let program = "var x = 0; while (x < 5) { print x; x = x + 1; } print x;"
+        Right result <- interpretStmt' program
+        result
+          `shouldBe` [ LoxStmtVoid, -- var
+                       LoxStmtBlock -- while
+                       -- print + assignment
+                         [ LoxStmtBlock [LoxStmtPrint "0", LoxStmtVoid],
+                           LoxStmtBlock [LoxStmtPrint "1", LoxStmtVoid],
+                           LoxStmtBlock [LoxStmtPrint "2", LoxStmtVoid],
+                           LoxStmtBlock [LoxStmtPrint "3", LoxStmtVoid],
+                           LoxStmtBlock [LoxStmtPrint "4", LoxStmtVoid]
+                         ],
+                       LoxStmtPrint "5" -- final print
+                     ]
 
 interpretExpr' :: Text -> IO (Either InterpretError LoxValue)
 interpretExpr' input = do

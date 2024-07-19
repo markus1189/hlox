@@ -7,7 +7,7 @@ import Control.Lens.Operators ((%=), (?=), (^.), (^?))
 import Control.Monad.Error.Class (liftEither)
 import Control.Monad.Except (MonadError (throwError))
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Loops (whileM_)
+import Control.Monad.Loops (whileM_, whileM)
 import Control.Monad.RWS (MonadState)
 import Control.Monad.State (StateT, evalStateT)
 import Data.Either.Combinators (maybeToRight)
@@ -56,8 +56,7 @@ evalPure stmts = evalStateT (traverse executePure stmts) initialEnv
       id %= popEnv
       pure (LoxStmtBlock xs)
     executePure (StmtWhile cond body) = do
-      whileM_ (isTruthy <$> interpret cond) (executePure body)
-      pure LoxStmtVoid
+      LoxStmtBlock <$> whileM (isTruthy <$> interpret cond) (executePure body)
 
 execute :: LoxStmtValue -> IO ()
 execute LoxStmtVoid = pure ()
