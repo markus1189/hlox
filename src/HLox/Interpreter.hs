@@ -19,6 +19,7 @@ import HLox.Parser.Types (Expr (..), Stmt (..))
 import HLox.Scanner.Types
 import HLox.Types (Lox)
 import HLox.Util (loxRuntimeError)
+import Data.Maybe (fromMaybe)
 
 eval :: (Traversable t) => t Stmt -> Lox ()
 eval stmts = do
@@ -31,6 +32,11 @@ evalPure :: (Traversable t) => t Stmt -> Either InterpretError (t LoxStmtValue)
 evalPure stmts = evalStateT (traverse executePure stmts) mempty
   where
     executePure :: Stmt -> StateT Environment (Either InterpretError) LoxStmtValue
+    executePure (StmtIf c t f) = do
+      c' <- interpret c
+      if isTruthy c'
+        then executePure t
+        else fromMaybe LoxStmtVoid <$> traverse executePure f
     executePure (StmtExpr e) = LoxStmtVoid <$ interpret e
     executePure (StmtPrint e) = do
       x <- interpret e

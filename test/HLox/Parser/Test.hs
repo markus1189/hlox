@@ -88,6 +88,10 @@ spec_simpleAst = do
           Left err -> expectationFailure [i|Could not parse the statement: #{err}|]
           Right expr -> pretty expr `shouldBe` "(sequence (block ) (print 1))"
 
+      it "should parse if statements" $ do
+        result <- fmap pretty <$> parse' "if (1 > 0) print \"true\"; else print \"false\";"
+        result `shouldBe` Right "(sequence (if (> 1 0) (print true) (print false)))"
+
 test_goldenParser :: TestTree
 test_goldenParser =
   testGroup

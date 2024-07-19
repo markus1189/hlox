@@ -61,8 +61,20 @@ parseVarDeclaration = do
 
 parseStatement :: StateT ParseState Lox Stmt
 parseStatement = do
-  ifM (match [PRINT]) parsePrintStatement $
-    ifM (match [LEFT_BRACE]) (StmtBlock <$> parseBlock) parseExpressionStatement
+  ifM (match [IF]) parseIfStatement $
+    ifM (match [PRINT]) parsePrintStatement $
+      ifM (match [LEFT_BRACE]) (StmtBlock <$> parseBlock) parseExpressionStatement
+
+parseIfStatement :: StateT ParseState Lox Stmt
+parseIfStatement = do
+  void $ consume LEFT_PAREN "Expect '(' after 'if'."
+  condition <- parseExpression
+  void $ consume RIGHT_PAREN "Expect ')' after if condition."
+
+  thenBranch <- parseStatement
+  elseBranch <- ifM (match [ELSE]) (Just <$> parseStatement) (pure Nothing)
+
+  pure $ StmtIf condition thenBranch elseBranch
 
 parsePrintStatement :: StateT ParseState Lox Stmt
 parsePrintStatement = do

@@ -44,6 +44,12 @@ spec_interpreterStmt = do
       it "should handle block expressions" $ do
         Right result <- interpretStmt' "var a = 1; { a = 2; var b = 3; print a + b; } print a;"
         result `shouldBe` [LoxStmtVoid, LoxStmtBlock [LoxStmtVoid, LoxStmtVoid, LoxStmtPrint "5"], LoxStmtPrint "1"]
+      it "should handle if statements" $ do
+        Right result <- interpretStmt' "if (true) { print 1; } else { print 2; }"
+        result `shouldBe` [LoxStmtBlock [LoxStmtPrint "1"]]
+      it "should handle if statements without else" $ do
+        Right result <- interpretStmt' "if (true) { print 1; }"
+        result `shouldBe` [LoxStmtBlock [LoxStmtPrint "1"]]
 
 interpretExpr' :: Text -> IO (Either InterpretError LoxValue)
 interpretExpr' input = do
