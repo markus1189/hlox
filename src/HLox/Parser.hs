@@ -74,7 +74,6 @@ parseBlock :: StateT ParseState Lox [Stmt]
 parseBlock = do
   stmts <- catMaybes <$> whileM ((&&) <$> (not <$> check RIGHT_BRACE) <*> (not <$> isAtEnd)) parseDeclaration
   void $ consume RIGHT_BRACE "Expect '}' after block."
-  void $ consume SEMICOLON "Expect ';' after block."
   pure stmts
 
 parseExpressionStatement :: StateT ParseState Lox Stmt
