@@ -1,4 +1,4 @@
-module HLox.Pretty (Pretty(pretty)) where
+module HLox.Pretty (Pretty (pretty)) where
 
 import Data.Text (Text)
 

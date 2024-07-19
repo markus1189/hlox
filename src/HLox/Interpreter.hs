@@ -3,10 +3,11 @@ module HLox.Interpreter (interpret, eval, evalPure) where
 import Control.Applicative ((<|>))
 import Control.Lens (at)
 import Control.Lens.Combinators (to, use)
-import Control.Lens.Operators ((.=), (?=), (^.), (^?))
+import Control.Lens.Operators ((%=), (?=), (^.), (^?))
 import Control.Monad.Error.Class (liftEither)
 import Control.Monad.Except (MonadError (throwError))
 import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Loops (whileM_)
 import Control.Monad.RWS (MonadState)
 import Control.Monad.State (StateT, evalStateT)
 import Data.Either.Combinators (maybeToRight)
@@ -29,7 +30,7 @@ eval stmts = do
     Right stmtValues -> liftIO $ for_ stmtValues execute
 
 evalPure :: (Traversable t) => t Stmt -> Either InterpretError (t LoxStmtValue)
-evalPure stmts = evalStateT (traverse executePure stmts) mempty
+evalPure stmts = evalStateT (traverse executePure stmts) initialEnv
   where
     executePure :: Stmt -> StateT Environment (Either InterpretError) LoxStmtValue
     executePure (StmtIf c t f) = do
@@ -50,10 +51,13 @@ evalPure stmts = evalStateT (traverse executePure stmts) mempty
       at name' ?= v
       pure LoxStmtVoid
     executePure (StmtBlock stmts') = do
-      env <- use id
+      id %= pushEnv
       xs <- traverse executePure stmts'
-      id .= env
+      id %= popEnv
       pure (LoxStmtBlock xs)
+    executePure (StmtWhile cond body) = do
+      whileM_ (isTruthy <$> interpret cond) (executePure body)
+      pure LoxStmtVoid
 
 execute :: LoxStmtValue -> IO ()
 execute LoxStmtVoid = pure ()

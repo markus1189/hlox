@@ -97,6 +97,10 @@ spec_simpleAst = do
         result <- fmap pretty <$> parse' "if (1 > 0) print \"true\"; else print \"false\";"
         result `shouldBe` Right "(sequence (if (> 1 0) (print true) (print false)))"
 
+      it "should parse while statements" $ do
+        result <- fmap pretty <$> parse' "while (1 and 2) { print 5; }"
+        result `shouldBe` Right "(sequence (while (and 1 2) (block (print 5))))"
+
 test_goldenParser :: TestTree
 test_goldenParser =
   testGroup

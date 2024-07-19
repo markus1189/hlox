@@ -10,9 +10,8 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TIO
 import HLox.Interpreter (eval, interpret)
-import HLox.Interpreter.Types (Environment, InterpretError)
+import HLox.Interpreter.Types (Environment (..), InterpretError, initialEnv)
 import HLox.Parser (parse, parseExpr, pretty)
-import HLox.Parser.Types (Stmt (StmtPrint))
 import HLox.Scanner (TokenType (SEMICOLON), scanTokens)
 import HLox.Scanner.Types (ScanError (..), tokenType)
 import HLox.Types (Lox, makeLoxEnv, runLox)
@@ -48,7 +47,7 @@ runPrompt = do
   S.effects $
     S.mapM mapper $
       S.takeWhile (not . Text.isPrefixOf ":q") $
-        S.map convertString $ do
+        S.map convertString $
           S.stdinLn @Lox
   liftIO $ TIO.putStrLn "Goodbye"
   where
@@ -73,9 +72,10 @@ run script = do
           parseResult <- parseExpr tokens
           case parseResult of
             Left _ -> pure ()
-            Right stmts -> do
-              let x = evalStateT (interpret @(StateT Environment (Either InterpretError)) stmts) mempty
-              liftIO $ traverse_ TIO.putStrLn $ fmap pretty $ x
+            Right stmts ->
+              liftIO $
+                traverse_ (TIO.putStrLn . pretty) $
+                  evalStateT (interpret @(StateT Environment (Either InterpretError)) stmts) initialEnv
     scanErrs -> do
       liftIO $ TIO.putStrLn "There were scan errors:"
       for_ scanErrs $ \(ScanError l msg) -> loxError l msg

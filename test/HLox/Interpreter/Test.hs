@@ -16,56 +16,64 @@ spec_interpreterExpr = do
   describe "Interpreter" $ do
     describe "valid expressions" $ do
       it "should evaluate boolean expression" $ do
-        Right result <- interpretExpr' "1 + 5 < 3 * 3"
-        result `shouldBe` LoxBool True
+        result <- interpretExpr' "1 + 5 < 3 * 3"
+        result `shouldBe` Right (LoxBool True)
       it "should evaluate number expression " $ do
-        Right result <- interpretExpr' "42 * 2"
-        result `shouldBe` LoxNumber 84
+        result <- interpretExpr' "42 * 2"
+        result `shouldBe` Right (LoxNumber 84)
       it "should concatenate strings" $ do
-        Right result <- interpretExpr' [i|"Hello" + " " + "World"|]
-        result `shouldBe` LoxText "Hello World"
+        result <- interpretExpr' [i|"Hello" + " " + "World"|]
+        result `shouldBe` Right (LoxText "Hello World")
       it "should stringify lhs operands" $ do
-        Right result <- interpretExpr' [i|42 + "!"|]
-        result `shouldBe` LoxText "42!"
+        result <- interpretExpr' [i|42 + "!"|]
+        result `shouldBe` Right (LoxText "42!")
       it "should stringify rhs operands" $ do
-        Right result <- interpretExpr' [i|"Answer: " + 42|]
-        result `shouldBe` LoxText "Answer: 42"
+        result <- interpretExpr' [i|"Answer: " + 42|]
+        result `shouldBe` Right (LoxText "Answer: 42")
       it "should evaluate logical and operators" $ do
-        Right result <- interpretExpr' "true and false"
-        result `shouldBe` LoxBool False
+        result <- interpretExpr' "true and false"
+        result `shouldBe` Right (LoxBool False)
       it "should evaluate logical or operators" $ do
-        Right result <- interpretExpr' "false or true"
-        result `shouldBe` LoxBool True
+        result <- interpretExpr' "false or true"
+        result `shouldBe` Right (LoxBool True)
       it "should preserve values based on truthiness" $ do
-        Right result <- sequenceA <$> traverse interpretExpr' [[i|"strings are true" or true|], [i|false or 42|]]
-        result `shouldBe` [LoxText "strings are true", LoxNumber 42]
+        result <- sequenceA <$> traverse interpretExpr' [[i|"strings are true" or true|], [i|false or 42|]]
+        result `shouldBe` Right [LoxText "strings are true", LoxNumber 42]
 
 spec_interpreterStmt :: SpecWith ()
 spec_interpreterStmt = do
   describe "Interpreter" $ do
     describe "valid statements" $ do
       it "should handle variables" $ do
-        Right result <- interpretStmt' "var a = 1; var b = 2; print a + b;"
-        result `shouldBe` [LoxStmtVoid, LoxStmtVoid, LoxStmtPrint "3"]
+        result <- interpretStmt' "var a = 1; var b = 2; print a + b;"
+        result `shouldBe` Right [LoxStmtVoid, LoxStmtVoid, LoxStmtPrint "3"]
       it "should handle re-assignments" $ do
-        Right result <- interpretStmt' "var a = 1; var b = 2; a = 2; print a + b;"
-        result `shouldBe` [LoxStmtVoid, LoxStmtVoid, LoxStmtVoid, LoxStmtPrint "4"]
+        result <- interpretStmt' "var a = 1; var b = 2; a = 2; print a + b;"
+        result `shouldBe` Right [LoxStmtVoid, LoxStmtVoid, LoxStmtVoid, LoxStmtPrint "4"]
       it "should handle block expressions" $ do
-        Right result <- interpretStmt' "var a = 1; { a = 2; var b = 3; print a + b; } print a;"
-        result `shouldBe` [LoxStmtVoid, LoxStmtBlock [LoxStmtVoid, LoxStmtVoid, LoxStmtPrint "5"], LoxStmtPrint "1"]
+        result <- interpretStmt' "var a = 1; { a = 2; var b = 3; print a + b; } print a;"
+        result `shouldBe` Right [LoxStmtVoid, LoxStmtBlock [LoxStmtVoid, LoxStmtVoid, LoxStmtPrint "5"], LoxStmtPrint "2"]
+      it "should handle block expression re-assignment of outer variables" $ do
+        result <- interpretStmt' "var a = 1; { a = 2; } print a;"
+        result `shouldBe` Right [LoxStmtVoid, LoxStmtBlock [LoxStmtVoid], LoxStmtPrint "2"]
       it "should handle if statements" $ do
-        Right result <- interpretStmt' "if (true) { print 1; } else { print 2; }"
-        result `shouldBe` [LoxStmtBlock [LoxStmtPrint "1"]]
+        result <- interpretStmt' "if (true) { print 1; } else { print 2; }"
+        result `shouldBe` Right [LoxStmtBlock [LoxStmtPrint "1"]]
       it "should handle if statements without else" $ do
-        Right result <- interpretStmt' "if (true) { print 1; }"
-        result `shouldBe` [LoxStmtBlock [LoxStmtPrint "1"]]
+        result <- interpretStmt' "if (true) { print 1; }"
+        result `shouldBe` Right [LoxStmtBlock [LoxStmtPrint "1"]]
+
+-- it "should handle while statements" $ do
+--   let program = "var x = 0; while (x < 5) { print x; x = x + 1; } print x;"
+--   Right result <- interpretStmt' program
+--   result `shouldBe` [LoxStmtBlock [LoxStmtPrint "1"]]
 
 interpretExpr' :: Text -> IO (Either InterpretError LoxValue)
 interpretExpr' input = do
   loxEnv <- makeLoxEnv
   let (tokens, _) = scanTokens input
   Right result <- flip runLox loxEnv $ parseExpr tokens
-  pure $ runExcept $ evalStateT (interpret result) mempty
+  pure $ runExcept $ evalStateT (interpret result) initialEnv
 
 interpretStmt' :: Text -> IO (Either InterpretError [LoxStmtValue])
 interpretStmt' input = do

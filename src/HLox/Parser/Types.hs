@@ -47,6 +47,7 @@ data Stmt
   | StmtIf !Expr !Stmt !(Maybe Stmt)
   | StmtPrint !Expr
   | StmtVar !Token !(Maybe Expr)
+  | StmtWhile !Expr !Stmt
   | StmtBlock ![Stmt]
   deriving (Show, Eq, Ord)
 
@@ -58,6 +59,7 @@ instance Pretty [Stmt] where
       pretty' (StmtVar n e) = [i|(assign #{view (lexeme . _Lexeme) n } #{maybe "" pretty e})|]
       pretty' (StmtBlock stmts') = [i|(block #{Text.unwords $ map pretty' stmts'})|]
       pretty' (StmtIf cond ifTrue ifFalse) = [i|(if #{pretty cond} #{pretty' ifTrue} #{maybe "" pretty' ifFalse})|]
+      pretty' (StmtWhile cond body) = [i|(while #{pretty cond} #{pretty' body})|]
 
 data ParseError = ParseError !Token !Text deriving (Show, Eq)
 

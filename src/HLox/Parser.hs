@@ -63,7 +63,8 @@ parseStatement :: StateT ParseState Lox Stmt
 parseStatement = do
   ifM (match [IF]) parseIfStatement $
     ifM (match [PRINT]) parsePrintStatement $
-      ifM (match [LEFT_BRACE]) (StmtBlock <$> parseBlock) parseExpressionStatement
+      ifM (match [WHILE]) parseWhileStatement $
+        ifM (match [LEFT_BRACE]) (StmtBlock <$> parseBlock) parseExpressionStatement
 
 parseIfStatement :: StateT ParseState Lox Stmt
 parseIfStatement = do
@@ -81,6 +82,12 @@ parsePrintStatement = do
   e <- parseExpression
   void $ consume SEMICOLON "Expect ';' after value."
   pure $ StmtPrint e
+
+parseWhileStatement :: StateT ParseState Lox Stmt
+parseWhileStatement = do
+  condition <- consume LEFT_PAREN "Expect '(' after 'while'." *> parseExpression
+  body <- consume RIGHT_PAREN "Expect ')' after 'while condition'." *> parseStatement
+  pure $ StmtWhile condition body
 
 parseBlock :: StateT ParseState Lox [Stmt]
 parseBlock = do
@@ -168,7 +175,7 @@ parsePrimary = ifM (match [FALSE]) (pure $ ExprLiteral (LitBool False))
     err <- lift $ createError t "Expect expression."
     liftIO . throwIO $ err
 
-parseBinary :: MonadState ParseState m => (a -> Token -> a -> a) -> m a -> [TokenType] -> m a
+parseBinary :: (MonadState ParseState m) => (a -> Token -> a -> a) -> m a -> [TokenType] -> m a
 parseBinary ctor p ts = do
   expr <- p
   fromMaybe expr . preview _last <$> unfoldrM unfoldStep expr
