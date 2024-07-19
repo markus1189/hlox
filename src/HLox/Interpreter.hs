@@ -11,6 +11,7 @@ import Control.Monad.RWS (MonadState)
 import Control.Monad.State (StateT, evalStateT)
 import Data.Either.Combinators (maybeToRight)
 import Data.Foldable (for_, traverse_)
+import Data.Maybe (fromMaybe)
 import Data.String.Interpolate (i)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TIO
@@ -19,7 +20,6 @@ import HLox.Parser.Types (Expr (..), Stmt (..))
 import HLox.Scanner.Types
 import HLox.Types (Lox)
 import HLox.Util (loxRuntimeError)
-import Data.Maybe (fromMaybe)
 
 eval :: (Traversable t) => t Stmt -> Lox ()
 eval stmts = do
@@ -104,6 +104,7 @@ interpret (ExprBinary lhs op rhs) = do
     opType = op ^. tokenType
     applyBinaryNumber f e1 e2 msg = liftEither $ maybeToRight (InterpretError op msg) $ fmap LoxNumber (f <$> e1 ^? _LoxNumber <*> e2 ^? _LoxNumber)
     applyBinaryBool f e1 e2 msg = liftEither $ maybeToRight (InterpretError op msg) $ fmap LoxBool (f <$> e1 ^? _LoxNumber <*> e2 ^? _LoxNumber)
+--
 interpret (ExprAssign name value) = do
   let name' = name ^. lexeme . _Lexeme
   v <- interpret value
@@ -119,6 +120,12 @@ interpret (ExprVariable name) = do
   case mv of
     Just v -> pure v
     Nothing -> throwError $ InterpretError name [i|Undefined variable '#{name'}'|]
+--
+interpret (ExprLogical lhs op rhs) = do
+  left <- interpret lhs
+  if (op ^. tokenType == OR && isTruthy left) || (op ^. tokenType == AND && not (isTruthy left))
+    then pure left
+    else interpret rhs
 
 isTruthy :: LoxValue -> Bool
 isTruthy LoxNil = False

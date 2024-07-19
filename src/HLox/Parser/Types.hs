@@ -14,6 +14,7 @@ import HLox.Scanner.Types
 data Expr
   = ExprAssign !Token !Expr
   | ExprBinary !Expr !Token !Expr
+  | ExprLogical !Expr !Token !Expr
   | ExprGrouping !Expr
   | ExprLiteral !Literal
   | ExprUnary !Token !Expr
@@ -23,6 +24,9 @@ data Expr
 instance Pretty Expr where
   pretty :: Expr -> Text
   pretty (ExprBinary lhs op rhs) = [i|(#{l} #{pretty lhs} #{pretty rhs})|]
+    where
+      l = op ^. lexeme . _Lexeme
+  pretty (ExprLogical lhs op rhs) = [i|(#{l} #{pretty lhs} #{pretty rhs})|]
     where
       l = op ^. lexeme . _Lexeme
   pretty (ExprGrouping e) = [i|(group #{pretty e})|]

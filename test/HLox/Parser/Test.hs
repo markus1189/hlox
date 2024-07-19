@@ -61,6 +61,11 @@ spec_simpleAst = do
         case result of
           Left err -> expectationFailure [i|Could not parse the statement: #{err}|]
           Right expr -> pretty expr `shouldBe` "(== (+ (* 1 2) 3) 6)"
+
+      it "should parse 'or' and 'and'" $ do
+        result <- fmap pretty <$> parseExpr' "true and true and true or false or true and false"
+        result `shouldBe` Right "(or (or (and (and True True) True) False) (and True False))"
+
     describe "statements" $ do
       it "should parse a statement" $ do
         result <- parse' "print 42;"

@@ -30,6 +30,15 @@ spec_interpreterExpr = do
       it "should stringify rhs operands" $ do
         Right result <- interpretExpr' [i|"Answer: " + 42|]
         result `shouldBe` LoxText "Answer: 42"
+      it "should evaluate logical and operators" $ do
+        Right result <- interpretExpr' "true and false"
+        result `shouldBe` LoxBool False
+      it "should evaluate logical or operators" $ do
+        Right result <- interpretExpr' "false or true"
+        result `shouldBe` LoxBool True
+      it "should preserve values based on truthiness" $ do
+        Right result <- sequenceA <$> traverse interpretExpr' [[i|"strings are true" or true|], [i|false or 42|]]
+        result `shouldBe` [LoxText "strings are true", LoxNumber 42]
 
 spec_interpreterStmt :: SpecWith ()
 spec_interpreterStmt = do

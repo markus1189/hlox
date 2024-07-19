@@ -99,7 +99,7 @@ parseExpression = parseAssignment
 
 parseAssignment :: StateT ParseState Lox Expr
 parseAssignment = do
-  expr <- parseEquality
+  expr <- parseOr
 
   ifM
     (match [EQUAL])
@@ -115,17 +115,23 @@ parseAssignment = do
     )
     (pure expr)
 
+parseOr :: StateT ParseState Lox Expr
+parseOr = parseBinary ExprLogical parseAnd [OR]
+
+parseAnd :: StateT ParseState Lox Expr
+parseAnd = parseBinary ExprLogical parseEquality [AND]
+
 parseEquality :: StateT ParseState Lox Expr
-parseEquality = parseBinary parseComparison [BANG_EQUAL, EQUAL_EQUAL]
+parseEquality = parseBinary ExprBinary parseComparison [BANG_EQUAL, EQUAL_EQUAL]
 
 parseComparison :: StateT ParseState Lox Expr
-parseComparison = parseBinary parseTerm [GREATER, GREATER_EQUAL, LESS, LESS_EQUAL]
+parseComparison = parseBinary ExprBinary parseTerm [GREATER, GREATER_EQUAL, LESS, LESS_EQUAL]
 
 parseTerm :: StateT ParseState Lox Expr
-parseTerm = parseBinary parseFactor [MINUS, PLUS]
+parseTerm = parseBinary ExprBinary parseFactor [MINUS, PLUS]
 
 parseFactor :: StateT ParseState Lox Expr
-parseFactor = parseBinary parseUnary [SLASH, STAR]
+parseFactor = parseBinary ExprBinary parseUnary [SLASH, STAR]
 
 parseUnary :: StateT ParseState Lox Expr
 parseUnary =
@@ -162,8 +168,8 @@ parsePrimary = ifM (match [FALSE]) (pure $ ExprLiteral (LitBool False))
     err <- lift $ createError t "Expect expression."
     liftIO . throwIO $ err
 
-parseBinary :: (MonadState ParseState m) => m Expr -> [TokenType] -> m Expr
-parseBinary p ts = do
+parseBinary :: MonadState ParseState m => (a -> Token -> a -> a) -> m a -> [TokenType] -> m a
+parseBinary ctor p ts = do
   expr <- p
   fromMaybe expr . preview _last <$> unfoldrM unfoldStep expr
   where
@@ -173,7 +179,7 @@ parseBinary p ts = do
         then do
           operator <- previous
           right <- p
-          let r = ExprBinary e operator right
+          let r = ctor e operator right
           pure $ Just (r, r)
         else pure Nothing
 
