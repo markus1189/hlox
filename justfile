@@ -8,9 +8,8 @@ buildloop:
 
 buildloop_step:
     #!/usr/bin/env bash
-    cabal build --enable-tests
-
     TTE_EFFECT="$(tte -h | awk '/Effect:/,/[[:space:]]*{/' | grep -o '{.*}' | tr -d '{}' | tr ',' '\n' | shuf | head -n 1)"
+    cabal build --enable-tests
 
     if [[ $? == "0" ]]; then
       notify-send -u low "HLox" "Build Ok"
@@ -20,6 +19,7 @@ buildloop_step:
 
         notify-send -u low "HLox" "Tests Green"
         figlet -f doom 'SUCCESS' | tte --anchor-canvas c --anchor-text c "${TTE_EFFECT}"
+        echo Used tte effect "'${TTE_EFFECT}'"
       else
         notify-send -u critical "HLox" "Tests Failed"
         figlet -f doom 'TEST FAIL' | tte --anchor-canvas c --anchor-text c decrypt
