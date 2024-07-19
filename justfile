@@ -10,6 +10,8 @@ buildloop_step:
     #!/usr/bin/env bash
     cabal build --enable-tests
 
+    TTE_EFFECT="$(echo 'beams,binarypath,blackhole,bouncyballs,bubbles,burn,colorshift,crumble,decrypt,errorcorrect,expand,fireworks,matrix,middleout,orbittingvolley,overflow,pour,print,rain,randomsequence,rings,scattered,slice,slide,spotlights,spray,swarm,synthgrid,unstable,vhstape,waves,wipe' | tr ',' '\n' | shuf | head -n 1)"
+
     if [[ $? == "0" ]]; then
       notify-send -u low "HLox" "Build Ok"
 
@@ -17,7 +19,7 @@ buildloop_step:
       if [[ $? == "0" ]]; then
 
         notify-send -u low "HLox" "Tests Green"
-        figlet -f doom 'SUCCESS' | tte --anchor-canvas c --anchor-text c beams
+        figlet -f doom 'SUCCESS' | tte --anchor-canvas c --anchor-text c "${TTE_EFFECT}"
       else
         notify-send -u critical "HLox" "Tests Failed"
         figlet -f doom 'TEST FAIL' | tte --anchor-canvas c --anchor-text c decrypt
