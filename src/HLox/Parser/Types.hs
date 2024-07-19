@@ -38,7 +38,7 @@ instance Pretty Expr where
     where
       l = op ^. lexeme . _Lexeme
   pretty (ExprVariable t) = t ^. lexeme . _Lexeme
-  pretty (ExprAssign name v) = [i|(reassign #{name'}) #{pretty v}|]
+  pretty (ExprAssign name v) = [i|(reassign #{name'} #{pretty v})|]
     where
       name' = name ^. lexeme . _Lexeme
 

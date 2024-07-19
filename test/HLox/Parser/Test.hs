@@ -101,6 +101,11 @@ spec_simpleAst = do
         result <- fmap pretty <$> parse' "while (1 and 2) { print 5; }"
         result `shouldBe` Right "(sequence (while (and 1 2) (block (print 5))))"
 
+      it "should parse for loops" $ do
+        result <- fmap pretty <$> parse' "for (var a = 1; a < 10; a = a + 1) { print a; }"
+        result `shouldBe` Right "(sequence (block (assign a 1) (while (< a 10) (block (block (print a)) (reassign a (+ a 1))))))"
+
+
 test_goldenParser :: TestTree
 test_goldenParser =
   testGroup

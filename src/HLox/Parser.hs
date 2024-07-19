@@ -61,10 +61,28 @@ parseVarDeclaration = do
 
 parseStatement :: StateT ParseState Lox Stmt
 parseStatement = do
-  ifM (match [IF]) parseIfStatement $
-    ifM (match [PRINT]) parsePrintStatement $
-      ifM (match [WHILE]) parseWhileStatement $
-        ifM (match [LEFT_BRACE]) (StmtBlock <$> parseBlock) parseExpressionStatement
+  ifM (match [FOR]) parseForStatement $
+    ifM (match [IF]) parseIfStatement $
+      ifM (match [PRINT]) parsePrintStatement $
+        ifM (match [WHILE]) parseWhileStatement $
+          ifM (match [LEFT_BRACE]) (StmtBlock <$> parseBlock) parseExpressionStatement
+
+parseForStatement :: StateT ParseState Lox Stmt
+parseForStatement = do
+  void $ consume LEFT_PAREN "Expect '(' after 'for'."
+  initializer <- ifM (match [SEMICOLON]) (pure Nothing) $
+    ifM (match [VAR]) (Just <$> parseVarDeclaration) $
+      Just <$> parseExpressionStatement
+  condition <- ifM (not <$> check SEMICOLON) (Just <$> parseExpression) (pure Nothing)
+  void $ consume SEMICOLON "Expect ';' after loop condition."
+  increment <- ifM (not <$> check RIGHT_PAREN) (Just <$> parseExpression) (pure Nothing)
+  void $ consume RIGHT_PAREN "Expect ')' after for clauses."
+  body <- parseStatement
+  let body' = maybe body (\increment' -> StmtBlock [body, StmtExpr increment']) increment
+      condition' = fromMaybe (ExprLiteral (LitBool True)) condition
+      body'' = StmtWhile condition' body'
+      body''' = maybe body'' (\initializer' -> StmtBlock [initializer', body'']) initializer
+  pure body'''
 
 parseIfStatement :: StateT ParseState Lox Stmt
 parseIfStatement = do
