@@ -10,7 +10,7 @@ buildloop_step:
     #!/usr/bin/env bash
     cabal build --enable-tests
 
-    TTE_EFFECT="$(echo 'beams,binarypath,blackhole,bouncyballs,bubbles,burn,colorshift,crumble,decrypt,errorcorrect,expand,fireworks,matrix,middleout,orbittingvolley,overflow,pour,print,rain,randomsequence,rings,scattered,slice,slide,spotlights,spray,swarm,synthgrid,unstable,vhstape,waves,wipe' | tr ',' '\n' | shuf | head -n 1)"
+    TTE_EFFECT="$(tte -h | awk '/Effect:/,/[[:space:]]*{/' | grep -o '{.*}' | tr -d '{}' | tr ',' '\n' | shuf | head -n 1)"
 
     if [[ $? == "0" ]]; then
       notify-send -u low "HLox" "Build Ok"
