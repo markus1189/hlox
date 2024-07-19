@@ -18,16 +18,13 @@ buildloop_step:
       if [[ $? == "0" ]]; then
 
         notify-send -u low "HLox" "Tests Green"
+        echo Using tte effect "'${TTE_EFFECT}'"
         figlet -f doom 'SUCCESS' | tte --anchor-canvas c --anchor-text c "${TTE_EFFECT}"
-        echo Used tte effect "'${TTE_EFFECT}'"
       else
         notify-send -u critical "HLox" "Tests Failed"
-        figlet -f doom 'TEST FAIL' | tte --anchor-canvas c --anchor-text c decrypt
-
       fi
     else
       notify-send -u critical "HLox" "Build Failed"
-      figlet -f doom 'BUILD FAIL' | tte --anchor-canvas c --anchor-text c decrypt
     fi
 
 test: format
