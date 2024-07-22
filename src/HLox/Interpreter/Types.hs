@@ -10,12 +10,13 @@ import Data.List (findIndex)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Maybe (isJust)
+import Data.String.Interpolate (i)
 import Data.Text (Text)
+import Data.Time.Clock.POSIX (getPOSIXTime)
 import Formatting (sformat, shortest)
 import HLox.Pretty (Pretty, pretty)
 import HLox.Scanner.Types
 import Numeric.Natural (Natural)
-import Data.String.Interpolate (i)
 
 data LoxStmtValue
   = LoxStmtVoid
@@ -58,17 +59,26 @@ data InterpretError = InterpretError !Token !Text
   deriving (Show, Eq)
 
 newtype Environment = Environment [Map Text LoxValue]
+
 makePrisms ''Environment
 
 initialEnv :: Environment
-initialEnv = Environment [mempty]
+initialEnv =
+  Environment
+    [ Map.fromList
+        [("clock", clockFun)]
+    ]
+  where
+    clockFun = LoxFun "clock" 0 $ \_ -> do
+      time <- realToFrac <$> getPOSIXTime
+      pure $ LoxNumber time
 
 pushEnv :: Environment -> Environment
-pushEnv (Environment es) = Environment (mempty:es)
+pushEnv (Environment es) = Environment (mempty : es)
 
 popEnv :: Environment -> Environment
 popEnv e@(Environment []) = e
-popEnv (Environment (_:es)) = Environment es
+popEnv (Environment (_ : es)) = Environment es
 
 type instance IxValue Environment = LoxValue
 

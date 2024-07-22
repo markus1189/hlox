@@ -16,7 +16,6 @@ import Data.Maybe (fromMaybe)
 import Data.String.Interpolate (i)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TIO
-import GHC.Num.Natural (Natural)
 import HLox.Interpreter.Types
 import HLox.Parser.Types (Expr (..), Stmt (..))
 import HLox.Scanner.Types
@@ -58,6 +57,7 @@ evalPure stmts = evalStateT (traverse executePure stmts) initialEnv
       pure (LoxStmtBlock xs)
     executePure (StmtWhile cond body) = do
       LoxStmtBlock <$> whileM (isTruthy <$> interpret cond) (executePure body)
+    executePure (StmtFunction _ _ _) = pure LoxStmtVoid
 
 execute :: LoxStmtValue -> IO ()
 execute LoxStmtVoid = pure ()

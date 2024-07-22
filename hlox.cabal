@@ -27,6 +27,7 @@ common deps
                    , string-conversions
                    , string-interpolate
                    , text
+                   , time
                    , transformers
                    , unordered-containers
                    , vector

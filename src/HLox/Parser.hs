@@ -47,12 +47,24 @@ parseDeclarations = catMaybes <$> whileM (not <$> isAtEnd) parseDeclaration
 parseDeclaration :: StateT ParseState Lox (Maybe Stmt)
 parseDeclaration =
   ( Just
-      <$> ifM
-        (match [VAR])
-        parseVarDeclaration
-        parseStatement
+      <$> (ifM (match [FUN]) (parseFunction "function") $ ifM (match [VAR])
+            parseVarDeclaration
+              parseStatement)
   )
     `catch` \(ParseError _ _) -> Nothing <$ synchronize
+
+parseFunction :: Text -> StateT ParseState Lox Stmt
+parseFunction kind = do
+  name <- consume IDENTIFIER [i|Expect #{kind} name.|]
+  void $ consume LEFT_PAREN [i|Expect '(' after #{kind} name.|]
+  parameters <- ifM (check RIGHT_PAREN) (pure []) $ do
+    consume IDENTIFIER "Expect parameter name." `untilM` (not <$> match [COMMA])
+  when (length parameters >= 255) $ do
+    t <- peek
+    void $ lift $ createError t "Can't have more than 255 arguments."
+  void $ consume RIGHT_PAREN "Expect ')' after parameters."
+  void $ consume LEFT_BRACE [i|Expect '{' before #{kind} body.|]
+  StmtFunction name parameters <$> parseBlock
 
 parseVarDeclaration :: StateT ParseState Lox Stmt
 parseVarDeclaration = do
