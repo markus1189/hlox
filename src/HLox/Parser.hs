@@ -8,7 +8,7 @@ import Control.Monad (void, when)
 import Control.Monad.Catch (catch, try)
 import Control.Monad.Extra (andM, findM, ifM, whenM)
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Loops (unfoldrM, whileM, whileM_)
+import Control.Monad.Loops (unfoldrM, whileM, whileM_, iterateM_, untilM)
 import Control.Monad.Reader (lift)
 import Control.Monad.State (MonadState, StateT (runStateT))
 import Data.Maybe (catMaybes, fromMaybe, isJust)
@@ -21,6 +21,8 @@ import HLox.Pretty (Pretty, pretty)
 import HLox.Scanner.Types
 import HLox.Types (Lox)
 import HLox.Util (loxReport)
+import Control.Monad.Except (runExceptT, throwError)
+import Data.Either.Extra (fromEither)
 
 data ParseState = ParseState
   { _psCurrent :: !Int,
@@ -166,7 +168,23 @@ parseUnary =
         op <- previous
         ExprUnary op <$> parseUnary
     )
-    parsePrimary
+    parseCall
+
+parseCall :: StateT ParseState Lox Expr
+parseCall = do
+  expr <- parsePrimary
+  res <- runExceptT $ flip iterateM_ expr $ \expr' -> do
+    ifM (match [LEFT_PAREN]) (lift $ finishCall expr') (throwError expr)
+  pure (fromEither res)
+
+finishCall :: Expr -> StateT ParseState Lox Expr
+finishCall callee = do
+  arguments <- ifM (not <$> check RIGHT_PAREN) (parseExpression `untilM` match [COMMA]) (pure [])
+  paren <- consume RIGHT_PAREN "Expect ')' after arguments."
+  when (length arguments >= 255) $ do
+    t <- peek
+    void $ lift $ createError t "Can't have more than 255 arguments."
+  pure $ ExprCall callee paren arguments
 
 parsePrimary :: StateT ParseState Lox Expr
 parsePrimary = ifM (match [FALSE]) (pure $ ExprLiteral (LitBool False))

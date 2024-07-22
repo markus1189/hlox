@@ -15,6 +15,7 @@ data Expr
   = ExprAssign !Token !Expr
   | ExprBinary !Expr !Token !Expr
   | ExprLogical !Expr !Token !Expr
+  | ExprCall !Expr !Token ![Expr]
   | ExprGrouping !Expr
   | ExprLiteral !Literal
   | ExprUnary !Token !Expr
@@ -41,6 +42,7 @@ instance Pretty Expr where
   pretty (ExprAssign name v) = [i|(reassign #{name'} #{pretty v})|]
     where
       name' = name ^. lexeme . _Lexeme
+  pretty (ExprCall callee _ arguments) = [i|(call #{pretty callee} (list (#{Text.unwords $ map pretty arguments})))|]
 
 data Stmt
   = StmtExpr !Expr
