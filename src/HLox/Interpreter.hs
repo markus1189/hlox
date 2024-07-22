@@ -4,24 +4,17 @@ import Control.Applicative ((<|>))
 import Control.Lens (at)
 import Control.Lens.Combinators (to, use, view)
 import Control.Lens.Operators
-  ( (%=),
-    (&),
-    (?=),
-    (?~),
-    (^.),
-    (^?),
-  )
+    ( (%=), (&), (?=), (?~), (^.), (^?), (.=) )
 import Control.Monad (unless, void)
 import Control.Monad.Error.Class (liftEither)
 import Control.Monad.Except (MonadError (throwError), runExceptT)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Loops (whileM)
-import Control.Monad.RWS (MonadState)
+import Control.Monad.Loops (whileM_)
+import Control.Monad.RWS (MonadState, MonadWriter)
 import Control.Monad.State (evalStateT)
 import Data.Either.Combinators (maybeToRight)
 import Data.Foldable (for_, traverse_)
 import Data.List (foldl')
-import Data.Maybe (fromMaybe)
 import Data.String.Interpolate (i)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TIO
@@ -31,52 +24,53 @@ import HLox.Parser.Types (Expr (..), Stmt (..))
 import HLox.Scanner.Types
 import HLox.Types (Lox)
 import HLox.Util (loxRuntimeError)
+import Control.Monad.Writer (runWriterT)
+import Control.Monad.Writer.Class (tell)
+import Control.Lens.Lens ((<<.=))
 
 eval :: (Traversable t) => t Stmt -> Lox ()
 eval stmts = do
-  r <- runExceptT $ evalPure initialEnv stmts
+  r <- runExceptT $ runWriterT $ flip evalStateT initialEnv $ evalPure stmts
   case r of
     Left err -> loxRuntimeError err
-    Right stmtValues -> liftIO $ for_ stmtValues execute
+    Right (_, effs) -> do liftIO $ for_ effs runEffect
 
-evalPure :: (Traversable t, MonadIO m, MonadError InterpretError m) => Environment -> t Stmt -> m (t LoxStmtValue)
-evalPure env stmts = evalStateT (traverse executePure stmts) env
+evalPure :: (Traversable t, MonadIO m, MonadState Environment m, MonadError InterpretError m, MonadWriter [LoxEffect] m) => t Stmt -> m ()
+evalPure = traverse_ executePure
   where
     executePure (StmtIf c t f) = do
       c' <- interpret c
       if isTruthy c'
         then executePure t
-        else fromMaybe LoxStmtVoid <$> traverse executePure f
-    executePure (StmtExpr e) = LoxStmtVoid <$ interpret e
+        else traverse_ executePure f
+    executePure (StmtExpr e) = void $ interpret e
     executePure (StmtPrint e) = do
       x <- interpret e
-      pure $ LoxStmtPrint $ stringify x
+      tell [LoxEffectPrint $ stringify x]
     executePure (StmtVar name Nothing) = do
       at (name ^. lexeme . _Lexeme) ?= LoxNil
-      pure LoxStmtVoid
+      pure ()
     executePure (StmtVar name (Just initializer)) = do
       v <- interpret initializer
       let name' = name ^. lexeme . _Lexeme
       at name' ?= v
-      pure LoxStmtVoid
+      pure ()
     executePure (StmtBlock stmts') = do
       id %= pushEnv
-      xs <- traverse executePure stmts'
+      traverse_ executePure stmts'
       id %= popEnv
-      pure (LoxStmtBlock xs)
-    executePure (StmtWhile cond body) = LoxStmtBlock <$> whileM (isTruthy <$> interpret cond) (executePure body)
+      pure ()
+    executePure (StmtWhile cond body) = whileM_ (isTruthy <$> interpret cond) (executePure body)
     executePure (StmtFunction name params body) = do
       let f = LoxFun (map (view (lexeme . _Lexeme)) params) body
           name' = view (lexeme . _Lexeme) name
       at name' ?= f
-      pure LoxStmtVoid
+      pure ()
 
-execute :: LoxStmtValue -> IO ()
-execute LoxStmtVoid = pure ()
-execute (LoxStmtPrint t) = TIO.putStrLn t
-execute (LoxStmtBlock vs) = traverse_ execute vs
+runEffect :: LoxEffect -> IO ()
+runEffect (LoxEffectPrint t) = TIO.putStrLn t
 
-interpret :: (MonadIO m, MonadState Environment m, MonadError InterpretError m) => Expr -> m LoxValue
+interpret :: (MonadIO m, MonadState Environment m, MonadError InterpretError m, MonadWriter [LoxEffect] m) => Expr -> m LoxValue
 --
 interpret (ExprLiteral LitNothing) = pure LoxNil
 interpret (ExprLiteral (LitText v)) = pure $ LoxText v
@@ -150,11 +144,13 @@ interpret (ExprCall callee paren arguments) = do
   let function = callee'
   call paren function args
 
-call :: (MonadIO m, MonadError InterpretError m, MonadState Environment m) => Token -> LoxValue -> [LoxValue] -> m LoxValue
+call :: (MonadIO m, MonadError InterpretError m, MonadState Environment m, MonadWriter [LoxEffect] m) => Token -> LoxValue -> [LoxValue] -> m LoxValue
 call _ (LoxFun params body) args = do
   let kvs = params `zip` args
       env = foldl' (\acc (k, v) -> acc & at k ?~ v) initialEnv kvs
-  void $ evalPure env body
+  oldEnv <- id <<.= env
+  void $ evalPure body
+  id .= oldEnv
   pure LoxNil
 call _ (LoxNativeFun LoxClock) _ = LoxNumber . realToFrac <$> liftIO getPOSIXTime
 call paren _ _ = throwError (InterpretError paren "Can only call functions and classes.")

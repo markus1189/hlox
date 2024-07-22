@@ -1,16 +1,17 @@
 module HLox (main) where
 
 import Control.Lens (view)
+import Control.Monad.Except (runExceptT)
 import Control.Monad.Extra (whenM)
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.State (StateT, evalStateT)
+import Control.Monad.State (evalStateT)
 import Data.Foldable (for_, traverse_)
 import Data.String.Conversions (convertString)
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TIO
 import HLox.Interpreter (eval, interpret)
-import HLox.Interpreter.Types (Environment (..), InterpretError, initialEnv)
+import HLox.Interpreter.Types (initialEnv)
 import HLox.Parser (parse, parseExpr, pretty)
 import HLox.Scanner (TokenType (SEMICOLON), scanTokens)
 import HLox.Scanner.Types (ScanError (..), tokenType)
@@ -19,7 +20,7 @@ import HLox.Util
 import Streaming.Prelude qualified as S
 import System.Environment (getArgs)
 import System.Exit (ExitCode (ExitFailure), exitWith)
-import Control.Monad.Except (runExceptT)
+import Control.Monad.Trans.Writer (WriterT(runWriterT))
 
 main :: IO ()
 main = do
@@ -48,7 +49,8 @@ runPrompt = do
   S.effects $
     S.mapM mapper $
       S.takeWhile (not . Text.isPrefixOf ":q") $
-        S.map convertString $ S.stdinLn @Lox
+        S.map convertString $
+          S.stdinLn @Lox
   liftIO $ TIO.putStrLn "Goodbye"
   where
     mapper :: Text -> Lox ()
@@ -71,7 +73,7 @@ run script = do
         else do
           parseResult <- parseExpr tokens
           for_ parseResult $ \stmts -> do
-            result <- evalStateT (runExceptT (interpret stmts)) initialEnv
+            result <- fmap (fmap fst) $ runExceptT $ runWriterT $ flip evalStateT initialEnv (interpret stmts)
             traverse_ (liftIO . TIO.putStrLn . pretty) result
     scanErrs -> do
       liftIO $ TIO.putStrLn "There were scan errors:"

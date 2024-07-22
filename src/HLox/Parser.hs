@@ -6,11 +6,13 @@ import Control.Lens.Operators ((+=), (^.))
 import Control.Lens.TH (makeLenses)
 import Control.Monad (void, when)
 import Control.Monad.Catch (catch, try)
+import Control.Monad.Except (runExceptT, throwError)
 import Control.Monad.Extra (andM, findM, ifM, whenM)
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Loops (unfoldrM, whileM, whileM_, iterateM_, untilM)
+import Control.Monad.Loops (iterateM_, unfoldrM, untilM, whileM, whileM_)
 import Control.Monad.Reader (lift)
 import Control.Monad.State (MonadState, StateT (runStateT))
+import Data.Either.Extra (fromEither)
 import Data.Maybe (catMaybes, fromMaybe, isJust)
 import Data.String.Interpolate (i)
 import Data.Text (Text)
@@ -21,8 +23,6 @@ import HLox.Pretty (Pretty, pretty)
 import HLox.Scanner.Types
 import HLox.Types (Lox)
 import HLox.Util (loxReport)
-import Control.Monad.Except (runExceptT, throwError)
-import Data.Either.Extra (fromEither)
 
 data ParseState = ParseState
   { _psCurrent :: !Int,
@@ -47,9 +47,12 @@ parseDeclarations = catMaybes <$> whileM (not <$> isAtEnd) parseDeclaration
 parseDeclaration :: StateT ParseState Lox (Maybe Stmt)
 parseDeclaration =
   ( Just
-      <$> (ifM (match [FUN]) (parseFunction "function") $ ifM (match [VAR])
-            parseVarDeclaration
-              parseStatement)
+      <$> ( ifM (match [FUN]) (parseFunction "function") $
+              ifM
+                (match [VAR])
+                parseVarDeclaration
+                parseStatement
+          )
   )
     `catch` \(ParseError _ _) -> Nothing <$ synchronize
 
@@ -84,9 +87,10 @@ parseStatement = do
 parseForStatement :: StateT ParseState Lox Stmt
 parseForStatement = do
   void $ consume LEFT_PAREN "Expect '(' after 'for'."
-  initializer <- ifM (match [SEMICOLON]) (pure Nothing) $
-    ifM (match [VAR]) (Just <$> parseVarDeclaration) $
-      Just <$> parseExpressionStatement
+  initializer <-
+    ifM (match [SEMICOLON]) (pure Nothing) $
+      ifM (match [VAR]) (Just <$> parseVarDeclaration) $
+        Just <$> parseExpressionStatement
   condition <- ifM (not <$> check SEMICOLON) (Just <$> parseExpression) (pure Nothing)
   void $ consume SEMICOLON "Expect ';' after loop condition."
   increment <- ifM (not <$> check RIGHT_PAREN) (Just <$> parseExpression) (pure Nothing)

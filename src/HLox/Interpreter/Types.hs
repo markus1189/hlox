@@ -13,16 +13,13 @@ import Data.Maybe (isJust)
 import Data.String.Interpolate (i)
 import Data.Text (Text)
 import Formatting (sformat, shortest)
+import HLox.Parser.Types (Stmt)
 import HLox.Pretty (Pretty, pretty)
 import HLox.Scanner.Types
-import HLox.Parser.Types (Stmt)
 
 data LoxNativeFunKind = LoxClock deriving (Show, Eq, Ord)
 
-data LoxStmtValue
-  = LoxStmtVoid
-  | LoxStmtPrint !Text
-  | LoxStmtBlock ![LoxStmtValue]
+data LoxEffect = LoxEffectPrint !Text
   deriving (Show, Eq, Ord)
 
 data LoxValue
@@ -56,7 +53,7 @@ newtype Environment = Environment [Map Text LoxValue]
 makePrisms ''Environment
 
 initialEnv :: Environment
-initialEnv = Environment [ Map.fromList [("clock", LoxNativeFun LoxClock)]]
+initialEnv = Environment [Map.fromList [("clock", LoxNativeFun LoxClock)]]
 
 pushEnv :: Environment -> Environment
 pushEnv (Environment es) = Environment (mempty : es)
