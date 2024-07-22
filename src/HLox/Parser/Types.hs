@@ -34,7 +34,7 @@ instance Pretty Expr where
   pretty (ExprAssign name v) = [i|(reassign #{pretty name} #{pretty v})|]
   pretty (ExprCall callee _ arguments) = [i|(call #{pretty callee} #{prettyList arguments})|]
 
-prettyList :: Pretty a => [a] -> Text
+prettyList :: (Pretty a) => [a] -> Text
 prettyList [] = "()"
 prettyList xs = [i|(list #{Text.unwords $ map pretty xs})|]
 

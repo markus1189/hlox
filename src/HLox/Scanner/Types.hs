@@ -3,8 +3,8 @@ module HLox.Scanner.Types where
 import Control.Lens (makePrisms)
 import Control.Lens.TH (makeLenses)
 import Data.Text (Text)
-import Numeric.Natural (Natural)
 import HLox.Pretty (Pretty, pretty)
+import Numeric.Natural (Natural)
 
 newtype Line = Line Natural
   deriving (Show, Eq, Ord, Num)

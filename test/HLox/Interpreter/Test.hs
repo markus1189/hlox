@@ -75,11 +75,12 @@ spec_interpreterStmt = do
                        LoxEffectPrint "5"
                      ]
       it "should handle functions" $ do
-        let program = [i|fun sayHi(first, last) {
-                           print "Hi, " + first + " " + last + "!";
-                         }
-                         sayHi("Dear", "Reader");
-                         |]
+        let program =
+              [i|fun sayHi(first, last) {
+                   print "Hi, " + first + " " + last + "!";
+                 }
+                 sayHi("Dear", "Reader");
+              |]
         Right result <- interpretStmt' program
         result `shouldBe` [LoxEffectPrint "Hi, Dear Reader!"]
 
