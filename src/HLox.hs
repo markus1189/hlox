@@ -19,6 +19,7 @@ import HLox.Util
 import Streaming.Prelude qualified as S
 import System.Environment (getArgs)
 import System.Exit (ExitCode (ExitFailure), exitWith)
+import Control.Monad.Except (runExceptT)
 
 main :: IO ()
 main = do
@@ -47,8 +48,7 @@ runPrompt = do
   S.effects $
     S.mapM mapper $
       S.takeWhile (not . Text.isPrefixOf ":q") $
-        S.map convertString $
-          S.stdinLn @Lox
+        S.map convertString $ S.stdinLn @Lox
   liftIO $ TIO.putStrLn "Goodbye"
   where
     mapper :: Text -> Lox ()
@@ -70,12 +70,9 @@ run script = do
             Right stmts -> eval stmts
         else do
           parseResult <- parseExpr tokens
-          case parseResult of
-            Left _ -> pure ()
-            Right stmts ->
-              liftIO $
-                traverse_ (TIO.putStrLn . pretty) $
-                  evalStateT (interpret @(StateT Environment (Either InterpretError)) stmts) initialEnv
+          for_ parseResult $ \stmts -> do
+            result <- evalStateT (runExceptT (interpret stmts)) initialEnv
+            traverse_ (liftIO . TIO.putStrLn . pretty) result
     scanErrs -> do
       liftIO $ TIO.putStrLn "There were scan errors:"
       for_ scanErrs $ \(ScanError l msg) -> loxError l msg

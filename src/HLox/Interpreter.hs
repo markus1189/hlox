@@ -5,11 +5,11 @@ import Control.Lens (at)
 import Control.Lens.Combinators (to, use)
 import Control.Lens.Operators ((%=), (?=), (^.), (^?))
 import Control.Monad.Error.Class (liftEither)
-import Control.Monad.Except (MonadError (throwError))
-import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Loops (whileM_, whileM)
+import Control.Monad.Except (MonadError (throwError), runExceptT)
+import Control.Monad.IO.Class ( liftIO, MonadIO )
+import Control.Monad.Loops (whileM)
 import Control.Monad.RWS (MonadState)
-import Control.Monad.State (StateT, evalStateT)
+import Control.Monad.State (evalStateT)
 import Data.Either.Combinators (maybeToRight)
 import Data.Foldable (for_, traverse_)
 import Data.Maybe (fromMaybe)
@@ -24,15 +24,14 @@ import HLox.Util (loxRuntimeError)
 
 eval :: (Traversable t) => t Stmt -> Lox ()
 eval stmts = do
-  let r = evalPure stmts
+  r <- runExceptT $ evalPure stmts
   case r of
     Left err -> loxRuntimeError err
     Right stmtValues -> liftIO $ for_ stmtValues execute
 
-evalPure :: (Traversable t) => t Stmt -> Either InterpretError (t LoxStmtValue)
+evalPure :: (Traversable t, MonadIO m, MonadError InterpretError m) => t Stmt -> m (t LoxStmtValue)
 evalPure stmts = evalStateT (traverse executePure stmts) initialEnv
   where
-    executePure :: Stmt -> StateT Environment (Either InterpretError) LoxStmtValue
     executePure (StmtIf c t f) = do
       c' <- interpret c
       if isTruthy c'
@@ -63,7 +62,7 @@ execute LoxStmtVoid = pure ()
 execute (LoxStmtPrint t) = TIO.putStrLn t
 execute (LoxStmtBlock vs) = traverse_ execute vs
 
-interpret :: (MonadState Environment m, MonadError InterpretError m) => Expr -> m LoxValue
+interpret :: (MonadIO m, MonadState Environment m, MonadError InterpretError m) => Expr -> m LoxValue
 --
 interpret (ExprLiteral LitNothing) = pure LoxNil
 interpret (ExprLiteral (LitText v)) = pure $ LoxText v
@@ -129,6 +128,16 @@ interpret (ExprLogical lhs op rhs) = do
   if (op ^. tokenType == OR && isTruthy left) || (op ^. tokenType == AND && not (isTruthy left))
     then pure left
     else interpret rhs
+--
+interpret (ExprCall callee paren arguments) = do
+  callee' <- interpret callee
+  args <- traverse interpret arguments
+  let function = callee'
+  call paren function args
+
+call :: (MonadIO m, MonadError InterpretError m) => Token -> LoxValue -> [LoxValue] -> m LoxValue
+call _ (LoxFun _ fn) args = liftIO $ fn args
+call paren _ _ = throwError (InterpretError paren "Can only call functions and classes.")
 
 isTruthy :: LoxValue -> Bool
 isTruthy LoxNil = False

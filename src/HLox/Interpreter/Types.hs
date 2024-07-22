@@ -26,9 +26,20 @@ data LoxValue
   | LoxText !Text
   | LoxNumber !Double
   | LoxBool !Bool
-  deriving (Show, Eq, Ord)
+  | LoxFun !Text !([LoxValue] -> IO LoxValue)
 
 makePrisms ''LoxValue
+
+instance Show LoxValue where
+  show = show . pretty
+
+instance Eq LoxValue where
+  LoxNil == LoxNil = True
+  LoxText t1 == LoxText t2 = t1 == t2
+  LoxNumber n1 == LoxNumber n2 = n1 == n2
+  LoxBool b1 == LoxBool b2 = b1 == b2
+  LoxFun _ _ == LoxFun _ _ = False
+  _ == _ = False
 
 instance Pretty LoxValue where
   pretty = stringify
@@ -39,11 +50,12 @@ stringify (LoxNumber n) = sformat shortest n
 stringify (LoxText t) = t
 stringify (LoxBool True) = "true"
 stringify (LoxBool False) = "false"
+stringify (LoxFun name _) = "<fn " <> name <> ">"
 
 data InterpretError = InterpretError !Token !Text
   deriving (Show, Eq)
 
-newtype Environment = Environment [Map Text LoxValue] deriving (Show, Eq, Ord)
+newtype Environment = Environment [Map Text LoxValue]
 makePrisms ''Environment
 
 initialEnv :: Environment

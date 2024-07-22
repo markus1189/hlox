@@ -1,6 +1,6 @@
 module HLox.Interpreter.Test where
 
-import Control.Monad.Except (runExcept)
+import Control.Monad.Except (runExcept, runExceptT)
 import Control.Monad.State (evalStateT)
 import Data.String.Interpolate (i)
 import Data.Text (Text)
@@ -83,11 +83,11 @@ interpretExpr' input = do
   loxEnv <- makeLoxEnv
   let (tokens, _) = scanTokens input
   Right result <- flip runLox loxEnv $ parseExpr tokens
-  pure $ runExcept $ evalStateT (interpret result) initialEnv
+  runExceptT $ evalStateT (interpret result) initialEnv
 
 interpretStmt' :: Text -> IO (Either InterpretError [LoxStmtValue])
 interpretStmt' input = do
   loxEnv <- makeLoxEnv
   let (tokens, _) = scanTokens input
   Right result <- flip runLox loxEnv $ parse tokens
-  pure $ evalPure result
+  runExceptT (evalPure result)
