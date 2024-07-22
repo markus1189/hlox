@@ -43,6 +43,7 @@ data Stmt
   | StmtFunction !Token ![Token] ![Stmt]
   | StmtIf !Expr !Stmt !(Maybe Stmt)
   | StmtPrint !Expr
+  | StmtReturn !Token !(Maybe Expr)
   | StmtVar !Token !(Maybe Expr)
   | StmtWhile !Expr !Stmt
   | StmtBlock ![Stmt]
@@ -58,6 +59,7 @@ instance Pretty [Stmt] where
       pretty' (StmtIf cond ifTrue ifFalse) = [i|(if #{pretty cond} #{pretty' ifTrue} #{maybe "" pretty' ifFalse})|]
       pretty' (StmtWhile cond body) = [i|(while #{pretty cond} #{pretty' body})|]
       pretty' (StmtFunction name params body) = [i|(declare-fun #{pretty name} #{prettyList params} #{pretty body})|]
+      pretty' (StmtReturn keyword value) = [i|(#{pretty keyword} #{maybe "nil" pretty value})|]
 
 data ParseError = ParseError !Token !Text deriving (Show, Eq)
 

@@ -92,8 +92,8 @@ interpret (ExprUnary t e) = case t ^. tokenType of
     right <- interpret e
     case right of
       LoxNumber n -> pure $ LoxNumber (negate n)
-      _ -> throwError $ InterpretError t "Unary minus on invalid value"
-  _ -> throwError $ InterpretError t "Unmatched case"
+      _ -> throwError $ InterpretRuntimeError t "Unary minus on invalid value"
+  _ -> throwError $ InterpretRuntimeError t "Unmatched case"
 --
 interpret (ExprBinary lhs op rhs) = do
   e1 <- interpret lhs
@@ -112,22 +112,22 @@ interpret (ExprBinary lhs op rhs) = do
     STAR -> applyBinaryNumber (*) e1 e2 "Invalid mult operands"
     PLUS ->
       liftEither $
-        maybeToRight (InterpretError op "Invalid plus operands") $
+        maybeToRight (InterpretRuntimeError op "Invalid plus operands") $
           let addNumbers = fmap LoxNumber $ (+) <$> e1 ^? _LoxNumber <*> e2 ^? _LoxNumber
               addStrings = fmap LoxText $ Text.append <$> e1 ^? to stringify <*> e2 ^? to stringify
            in addNumbers <|> addStrings
-    _ -> throwError (InterpretError op "Invalid operand case")
+    _ -> throwError (InterpretRuntimeError op "Invalid operand case")
   where
     opType = op ^. tokenType
-    applyBinaryNumber f e1 e2 msg = liftEither $ maybeToRight (InterpretError op msg) $ fmap LoxNumber (f <$> e1 ^? _LoxNumber <*> e2 ^? _LoxNumber)
-    applyBinaryBool f e1 e2 msg = liftEither $ maybeToRight (InterpretError op msg) $ fmap LoxBool (f <$> e1 ^? _LoxNumber <*> e2 ^? _LoxNumber)
+    applyBinaryNumber f e1 e2 msg = liftEither $ maybeToRight (InterpretRuntimeError op msg) $ fmap LoxNumber (f <$> e1 ^? _LoxNumber <*> e2 ^? _LoxNumber)
+    applyBinaryBool f e1 e2 msg = liftEither $ maybeToRight (InterpretRuntimeError op msg) $ fmap LoxBool (f <$> e1 ^? _LoxNumber <*> e2 ^? _LoxNumber)
 --
 interpret (ExprAssign name value) = do
   let name' = name ^. lexeme . _Lexeme
   v <- interpret value
   r <- use (at name')
   case r of
-    Nothing -> throwError (InterpretError name [i|Undefined variable '#{name'}'|])
+    Nothing -> throwError (InterpretRuntimeError name [i|Undefined variable '#{name'}'|])
     Just _ -> at name' ?= v
   pure v
 --
@@ -136,7 +136,7 @@ interpret (ExprVariable name) = do
   mv <- use $ at name'
   case mv of
     Just v -> pure v
-    Nothing -> throwError $ InterpretError name [i|Undefined variable '#{name'}'|]
+    Nothing -> throwError $ InterpretRuntimeError name [i|Undefined variable '#{name'}'|]
 --
 interpret (ExprLogical lhs op rhs) = do
   left <- interpret lhs
@@ -160,11 +160,11 @@ call _ (LoxFun params body) args = do
   id .= oldEnv
   pure LoxNil
 call _ (LoxNativeFun LoxClock) _ = LoxNumber . realToFrac <$> liftIO getPOSIXTime
-call paren _ _ = throwError (InterpretError paren "Can only call functions and classes.")
+call paren _ _ = throwError (InterpretRuntimeError paren "Can only call functions and classes.")
 
 checkArity :: (MonadError InterpretError m) => Token -> Int -> LoxValue -> m ()
-checkArity paren a1 (LoxFun a2 _) = unless (a1 == length a2) $ throwError (InterpretError paren [i|Expected #{length a2} arguments but got #{a1}.|])
-checkArity paren a1 (LoxNativeFun LoxClock) = unless (a1 == 0) $ throwError (InterpretError paren [i|Expected 0 arguments but got #{a1}.|])
+checkArity paren a1 (LoxFun a2 _) = unless (a1 == length a2) $ throwError (InterpretRuntimeError paren [i|Expected #{length a2} arguments but got #{a1}.|])
+checkArity paren a1 (LoxNativeFun LoxClock) = unless (a1 == 0) $ throwError (InterpretRuntimeError paren [i|Expected 0 arguments but got #{a1}.|])
 checkArity _ _ _ = pure ()
 
 isTruthy :: LoxValue -> Bool

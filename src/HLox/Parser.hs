@@ -83,8 +83,9 @@ parseStatement = do
   ifM (match [FOR]) parseForStatement $
     ifM (match [IF]) parseIfStatement $
       ifM (match [PRINT]) parsePrintStatement $
-        ifM (match [WHILE]) parseWhileStatement $
-          ifM (match [LEFT_BRACE]) (StmtBlock <$> parseBlock) parseExpressionStatement
+        ifM (match [RETURN]) parseReturnStatement $
+          ifM (match [WHILE]) parseWhileStatement $
+            ifM (match [LEFT_BRACE]) (StmtBlock <$> parseBlock) parseExpressionStatement
 
 parseForStatement :: StateT ParseState Lox Stmt
 parseForStatement = do
@@ -120,6 +121,13 @@ parsePrintStatement = do
   e <- parseExpression
   void $ consume SEMICOLON "Expect ';' after value."
   pure $ StmtPrint e
+
+parseReturnStatement :: StateT ParseState Lox Stmt
+parseReturnStatement = do
+  keyword <- previous
+  value <- ifM (check SEMICOLON) (pure Nothing) (Just <$> parseExpression)
+  void $ consume SEMICOLON "Expect ';' after return value."
+  pure $ StmtReturn keyword value
 
 parseWhileStatement :: StateT ParseState Lox Stmt
 parseWhileStatement = do

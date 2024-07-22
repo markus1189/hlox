@@ -45,7 +45,9 @@ stringify (LoxBool False) = "false"
 stringify (LoxFun _ _) = "<function>"
 stringify (LoxNativeFun k) = [i|<native function: #{show k}>|]
 
-data InterpretError = InterpretError !Token !Text
+data InterpretError =
+  InterpretRuntimeError !Token !Text
+  | InterpretReturn !LoxValue
   deriving (Show, Eq)
 
 newtype Environment = Environment [Map Text LoxValue]
