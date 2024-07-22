@@ -65,15 +65,16 @@ spec_interpreterStmt = do
         result `shouldBe` Right [LoxEffectPrint "1"]
       it "should handle while statements" $ do
         let program = "var x = 0; while (x < 5) { print x; x = x + 1; } print x;"
-        Right result <- interpretStmt' program
+        result <- interpretStmt' program
         result
-          `shouldBe` [ LoxEffectPrint "0",
-                       LoxEffectPrint "1",
-                       LoxEffectPrint "2",
-                       LoxEffectPrint "3",
-                       LoxEffectPrint "4",
-                       LoxEffectPrint "5"
-                     ]
+          `shouldBe` Right
+            [ LoxEffectPrint "0",
+              LoxEffectPrint "1",
+              LoxEffectPrint "2",
+              LoxEffectPrint "3",
+              LoxEffectPrint "4",
+              LoxEffectPrint "5"
+            ]
       it "should handle functions" $ do
         let program =
               [i|fun sayHi(first, last) {
@@ -81,8 +82,43 @@ spec_interpreterStmt = do
                  }
                  sayHi("Dear", "Reader");
               |]
-        Right result <- interpretStmt' program
-        result `shouldBe` [LoxEffectPrint "Hi, Dear Reader!"]
+        result <- interpretStmt' program
+        result `shouldBe` Right [LoxEffectPrint "Hi, Dear Reader!"]
+
+      it "should handle fibonacci" $ do
+        let program =
+              [i|fun fib(n) {
+                   if (n <= 1) return n;
+                   return fib(n - 2) + fib(n - 1);
+                 }
+                 for (var i = 0; i < 20; i = i + 1) {
+                   print fib(i);
+                 }
+              |]
+        result <- interpretStmt' program
+        result
+          `shouldBe` Right
+            [ LoxEffectPrint "0",
+              LoxEffectPrint "1",
+              LoxEffectPrint "1",
+              LoxEffectPrint "2",
+              LoxEffectPrint "3",
+              LoxEffectPrint "5",
+              LoxEffectPrint "8",
+              LoxEffectPrint "13",
+              LoxEffectPrint "21",
+              LoxEffectPrint "34",
+              LoxEffectPrint "55",
+              LoxEffectPrint "89",
+              LoxEffectPrint "144",
+              LoxEffectPrint "233",
+              LoxEffectPrint "377",
+              LoxEffectPrint "610",
+              LoxEffectPrint "987",
+              LoxEffectPrint "1597",
+              LoxEffectPrint "2584",
+              LoxEffectPrint "4181"
+            ]
 
 interpretExpr' :: Text -> IO (Either InterpretError (LoxValue, [LoxEffect]))
 interpretExpr' input = do

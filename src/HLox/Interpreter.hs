@@ -14,7 +14,7 @@ import Control.Lens.Operators
     (^?),
   )
 import Control.Monad (unless, void)
-import Control.Monad.Error.Class (liftEither)
+import Control.Monad.Error.Class (liftEither, tryError)
 import Control.Monad.Except (MonadError (throwError), runExceptT)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Loops (whileM_)
@@ -25,6 +25,7 @@ import Control.Monad.Writer.Class (tell)
 import Data.Either.Combinators (maybeToRight)
 import Data.Foldable (for_, traverse_)
 import Data.List (foldl')
+import Data.Maybe (fromMaybe)
 import Data.String.Interpolate (i)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TIO
@@ -73,6 +74,11 @@ evalPure = traverse_ executePure
           name' = view (lexeme . _Lexeme) name
       at name' ?= f
       pure ()
+    executePure (StmtReturn _ value) = do
+      r <- case value of
+        Just v -> interpret v
+        Nothing -> pure LoxNil
+      throwError (InterpretReturn r)
 
 runEffect :: LoxEffect -> IO ()
 runEffect (LoxEffectPrint t) = TIO.putStrLn t
@@ -153,12 +159,17 @@ interpret (ExprCall callee paren arguments) = do
 
 call :: (MonadIO m, MonadError InterpretError m, MonadState Environment m, MonadWriter [LoxEffect] m) => Token -> LoxValue -> [LoxValue] -> m LoxValue
 call _ (LoxFun params body) args = do
+  env <- use id
   let kvs = params `zip` args
-      env = foldl' (\acc (k, v) -> acc & at k ?~ v) initialEnv kvs
-  oldEnv <- id <<.= env
-  void $ evalPure body
+      env' = foldl' (\acc (k, v) -> acc & at k ?~ v) env kvs
+  oldEnv <- id <<.= env'
+  r <- tryError $ evalPure body
+  r' <- case r of
+    Left (InterpretReturn v) -> pure $ Just v
+    Left e@(InterpretRuntimeError _ _) -> throwError e
+    Right _ -> pure Nothing
   id .= oldEnv
-  pure LoxNil
+  pure (fromMaybe LoxNil r')
 call _ (LoxNativeFun LoxClock) _ = LoxNumber . realToFrac <$> liftIO getPOSIXTime
 call paren _ _ = throwError (InterpretRuntimeError paren "Can only call functions and classes.")
 
