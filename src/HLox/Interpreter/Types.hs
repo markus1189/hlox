@@ -27,11 +27,9 @@ data LoxValue
   | LoxText !Text
   | LoxNumber !Double
   | LoxBool !Bool
-  | LoxFun ![Text] ![Stmt]
+  | LoxFun ![Text] !Environment ![Stmt]
   | LoxNativeFun !LoxNativeFunKind
   deriving (Show, Eq, Ord)
-
-makePrisms ''LoxValue
 
 instance Pretty LoxValue where
   pretty = stringify
@@ -42,7 +40,7 @@ stringify (LoxNumber n) = sformat shortest n
 stringify (LoxText t) = t
 stringify (LoxBool True) = "true"
 stringify (LoxBool False) = "false"
-stringify (LoxFun _ _) = "<function>"
+stringify (LoxFun _ _ _) = "<function>"
 stringify (LoxNativeFun k) = [i|<native function: #{show k}>|]
 
 data InterpretError
@@ -50,15 +48,20 @@ data InterpretError
   | InterpretReturn !LoxValue
   deriving (Show, Eq)
 
-newtype Environment = Environment [Map Text LoxValue]
+newtype Environment = Environment [Map Text LoxValue] deriving (Show, Eq, Ord)
+
+makePrisms ''LoxValue
 
 makePrisms ''Environment
 
 initialEnv :: Environment
 initialEnv = Environment [Map.fromList [("clock", LoxNativeFun LoxClock)]]
 
-pushEnv :: Environment -> Environment
-pushEnv (Environment es) = Environment (mempty : es)
+pushEnv :: Environment -> Environment -> Environment
+pushEnv (Environment es1) (Environment es2) = Environment (es1 ++ es2)
+
+pushEmptyEnv :: Environment -> Environment
+pushEmptyEnv (Environment es) = Environment (mempty : es)
 
 popEnv :: Environment -> Environment
 popEnv e@(Environment []) = e

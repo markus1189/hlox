@@ -3,11 +3,9 @@ module HLox.Interpreter (interpret, eval, evalPure) where
 import Control.Applicative ((<|>))
 import Control.Lens (at)
 import Control.Lens.Combinators (to, use, view)
-import Control.Lens.Lens ((<<.=))
 import Control.Lens.Operators
   ( (%=),
     (&),
-    (.=),
     (?=),
     (?~),
     (^.),
@@ -64,13 +62,14 @@ evalPure = traverse_ executePure
       at name' ?= v
       pure ()
     executePure (StmtBlock stmts') = do
-      id %= pushEnv
+      id %= pushEmptyEnv
       traverse_ executePure stmts'
       id %= popEnv
       pure ()
     executePure (StmtWhile cond body) = whileM_ (isTruthy <$> interpret cond) (executePure body)
     executePure (StmtFunction name params body) = do
-      let f = LoxFun (map (view (lexeme . _Lexeme)) params) body
+      env <- use id
+      let f = LoxFun (map (view (lexeme . _Lexeme)) params) env body
           name' = view (lexeme . _Lexeme) name
       at name' ?= f
       pure ()
@@ -158,23 +157,21 @@ interpret (ExprCall callee paren arguments) = do
   call paren function args
 
 call :: (MonadIO m, MonadError InterpretError m, MonadState Environment m, MonadWriter [LoxEffect] m) => Token -> LoxValue -> [LoxValue] -> m LoxValue
-call _ (LoxFun params body) args = do
-  env <- use id
-  let kvs = params `zip` args
-      env' = foldl' (\acc (k, v) -> acc & at k ?~ v) env kvs
-  oldEnv <- id <<.= env'
+call _ (LoxFun params funEnv body) args = do
+  let funEnvWithParams = foldl' (\acc (k, v) -> acc & at k ?~ v) funEnv (params `zip` args)
+  id %= pushEnv funEnvWithParams
   r <- tryError $ evalPure body
   r' <- case r of
     Left (InterpretReturn v) -> pure $ Just v
     Left e@(InterpretRuntimeError _ _) -> throwError e
     Right _ -> pure Nothing
-  id .= oldEnv
+  id %= popEnv
   pure (fromMaybe LoxNil r')
 call _ (LoxNativeFun LoxClock) _ = LoxNumber . realToFrac <$> liftIO getPOSIXTime
 call paren _ _ = throwError (InterpretRuntimeError paren "Can only call functions and classes.")
 
 checkArity :: (MonadError InterpretError m) => Token -> Int -> LoxValue -> m ()
-checkArity paren a1 (LoxFun a2 _) = unless (a1 == length a2) $ throwError (InterpretRuntimeError paren [i|Expected #{length a2} arguments but got #{a1}.|])
+checkArity paren a1 (LoxFun a2 _ _) = unless (a1 == length a2) $ throwError (InterpretRuntimeError paren [i|Expected #{length a2} arguments but got #{a1}.|])
 checkArity paren a1 (LoxNativeFun LoxClock) = unless (a1 == 0) $ throwError (InterpretRuntimeError paren [i|Expected 0 arguments but got #{a1}.|])
 checkArity _ _ _ = pure ()
 

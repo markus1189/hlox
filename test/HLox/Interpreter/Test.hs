@@ -120,6 +120,30 @@ spec_interpreterStmt = do
               LoxEffectPrint "4181"
             ]
 
+      it "should handle closures (makeCounter)" $ do
+        let program =
+              [i|fun makeCounter() {
+                   var i = 0;
+
+                   fun count() {
+                     i = i + 1;
+                     print i;
+                   }
+
+                   return count;
+                 }
+
+                 var counter = makeCounter();
+                 counter();
+                 counter();
+              |]
+        result <- interpretStmt' program
+        result
+          `shouldBe` Right
+            [ LoxEffectPrint "1",
+              LoxEffectPrint "2"
+            ]
+
 interpretExpr' :: Text -> IO (Either InterpretError (LoxValue, [LoxEffect]))
 interpretExpr' input = do
   loxEnv <- makeLoxEnv
