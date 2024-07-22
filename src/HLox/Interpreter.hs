@@ -3,8 +3,16 @@ module HLox.Interpreter (interpret, eval, evalPure) where
 import Control.Applicative ((<|>))
 import Control.Lens (at)
 import Control.Lens.Combinators (to, use, view)
+import Control.Lens.Lens ((<<.=))
 import Control.Lens.Operators
-    ( (%=), (&), (?=), (?~), (^.), (^?), (.=) )
+  ( (%=),
+    (&),
+    (.=),
+    (?=),
+    (?~),
+    (^.),
+    (^?),
+  )
 import Control.Monad (unless, void)
 import Control.Monad.Error.Class (liftEither)
 import Control.Monad.Except (MonadError (throwError), runExceptT)
@@ -12,6 +20,8 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Loops (whileM_)
 import Control.Monad.RWS (MonadState, MonadWriter)
 import Control.Monad.State (evalStateT)
+import Control.Monad.Writer (runWriterT)
+import Control.Monad.Writer.Class (tell)
 import Data.Either.Combinators (maybeToRight)
 import Data.Foldable (for_, traverse_)
 import Data.List (foldl')
@@ -24,9 +34,6 @@ import HLox.Parser.Types (Expr (..), Stmt (..))
 import HLox.Scanner.Types
 import HLox.Types (Lox)
 import HLox.Util (loxRuntimeError)
-import Control.Monad.Writer (runWriterT)
-import Control.Monad.Writer.Class (tell)
-import Control.Lens.Lens ((<<.=))
 
 eval :: (Traversable t) => t Stmt -> Lox ()
 eval stmts = do

@@ -1,8 +1,6 @@
 module HLox.Parser.Types where
 
 import Control.Exception (Exception)
-import Control.Lens.Combinators (view)
-import Control.Lens.Operators ((^.))
 import Data.String.Interpolate (i)
 import Data.Text (Text)
 import Data.Text qualified as Text
@@ -24,25 +22,21 @@ data Expr
 
 instance Pretty Expr where
   pretty :: Expr -> Text
-  pretty (ExprBinary lhs op rhs) = [i|(#{l} #{pretty lhs} #{pretty rhs})|]
-    where
-      l = op ^. lexeme . _Lexeme
-  pretty (ExprLogical lhs op rhs) = [i|(#{l} #{pretty lhs} #{pretty rhs})|]
-    where
-      l = op ^. lexeme . _Lexeme
+  pretty (ExprBinary lhs op rhs) = [i|(#{pretty op} #{pretty lhs} #{pretty rhs})|]
+  pretty (ExprLogical lhs op rhs) = [i|(#{pretty op} #{pretty lhs} #{pretty rhs})|]
   pretty (ExprGrouping e) = [i|(group #{pretty e})|]
   pretty (ExprLiteral LitNothing) = "nil"
   pretty (ExprLiteral (LitText txt)) = txt
   pretty (ExprLiteral (LitNumber num)) = sformat shortest num
   pretty (ExprLiteral (LitBool b)) = sformat build b
-  pretty (ExprUnary op e) = [i|(#{l} #{pretty e})|]
-    where
-      l = op ^. lexeme . _Lexeme
-  pretty (ExprVariable t) = t ^. lexeme . _Lexeme
-  pretty (ExprAssign name v) = [i|(reassign #{name'} #{pretty v})|]
-    where
-      name' = name ^. lexeme . _Lexeme
-  pretty (ExprCall callee _ arguments) = [i|(call #{pretty callee} (list (#{Text.unwords $ map pretty arguments})))|]
+  pretty (ExprUnary op e) = [i|(#{pretty op} #{pretty e})|]
+  pretty (ExprVariable t) = pretty t
+  pretty (ExprAssign name v) = [i|(reassign #{pretty name} #{pretty v})|]
+  pretty (ExprCall callee _ arguments) = [i|(call #{pretty callee} #{prettyList arguments})|]
+
+prettyList :: Pretty a => [a] -> Text
+prettyList [] = "()"
+prettyList xs = [i|(list #{Text.unwords $ map pretty xs})|]
 
 data Stmt
   = StmtExpr !Expr
@@ -59,11 +53,11 @@ instance Pretty [Stmt] where
     where
       pretty' (StmtExpr e) = pretty e
       pretty' (StmtPrint e) = [i|(print #{pretty e})|]
-      pretty' (StmtVar n e) = [i|(assign #{view (lexeme . _Lexeme) n } #{maybe "" pretty e})|]
+      pretty' (StmtVar n e) = [i|(assign #{pretty n } #{maybe "" pretty e})|]
       pretty' (StmtBlock stmts') = [i|(block #{Text.unwords $ map pretty' stmts'})|]
       pretty' (StmtIf cond ifTrue ifFalse) = [i|(if #{pretty cond} #{pretty' ifTrue} #{maybe "" pretty' ifFalse})|]
       pretty' (StmtWhile cond body) = [i|(while #{pretty cond} #{pretty' body})|]
-      pretty' (StmtFunction name params body) = [i|(lambda #{view (lexeme . _Lexeme) name} (list #{Text.unwords $ map (view (lexeme . _Lexeme)) params}) #{pretty body})|]
+      pretty' (StmtFunction name params body) = [i|(declare-fun #{pretty name} #{prettyList params} #{pretty body})|]
 
 data ParseError = ParseError !Token !Text deriving (Show, Eq)
 

@@ -105,6 +105,14 @@ spec_simpleAst = do
         result <- fmap pretty <$> parse' "for (var a = 1; a < 10; a = a + 1) { print a; }"
         result `shouldBe` Right "(sequence (block (assign a 1) (while (< a 10) (block (block (print a)) (reassign a (+ a 1))))))"
 
+      it "should parse functions" $ do
+        result <- fmap pretty <$> parse' "fun f() { print \"42\"; }"
+        result `shouldBe` Right "(sequence (declare-fun f () (sequence (print 42))))"
+
+      it "should parse function calls" $ do
+        result <- fmap pretty <$> parse' "average(1, 2);"
+        result `shouldBe` Right "(sequence (call average (list 1 2)))"
+
 test_goldenParser :: TestTree
 test_goldenParser =
   testGroup

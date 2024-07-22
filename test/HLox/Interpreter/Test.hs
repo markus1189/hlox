@@ -18,7 +18,7 @@ spec_interpreterExpr = do
     describe "valid expressions" $ do
       it "should evaluate boolean expression" $ do
         result <- interpretExpr' "1 + 5 < 3 * 3"
-        result `shouldBe` Right (LoxBool True,[])
+        result `shouldBe` Right (LoxBool True, [])
       it "should evaluate number expression " $ do
         result <- interpretExpr' "42 * 2"
         result `shouldBe` Right (LoxNumber 84, [])
@@ -74,6 +74,14 @@ spec_interpreterStmt = do
                        LoxEffectPrint "4",
                        LoxEffectPrint "5"
                      ]
+      it "should handle functions" $ do
+        let program = [i|fun sayHi(first, last) {
+                           print "Hi, " + first + " " + last + "!";
+                         }
+                         sayHi("Dear", "Reader");
+                         |]
+        Right result <- interpretStmt' program
+        result `shouldBe` [LoxEffectPrint "Hi, Dear Reader!"]
 
 interpretExpr' :: Text -> IO (Either InterpretError (LoxValue, [LoxEffect]))
 interpretExpr' input = do

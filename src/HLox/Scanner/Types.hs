@@ -4,6 +4,7 @@ import Control.Lens (makePrisms)
 import Control.Lens.TH (makeLenses)
 import Data.Text (Text)
 import Numeric.Natural (Natural)
+import HLox.Pretty (Pretty, pretty)
 
 newtype Line = Line Natural
   deriving (Show, Eq, Ord, Num)
@@ -76,5 +77,8 @@ data Token = Token
   deriving (Show, Eq, Ord)
 
 makeLenses ''Token
+
+instance Pretty Token where
+  pretty (Token _ (Lexeme t) _ _) = t
 
 data ScanError = ScanError !Line !Text deriving (Show, Eq, Ord)

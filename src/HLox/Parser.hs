@@ -47,12 +47,14 @@ parseDeclarations = catMaybes <$> whileM (not <$> isAtEnd) parseDeclaration
 parseDeclaration :: StateT ParseState Lox (Maybe Stmt)
 parseDeclaration =
   ( Just
-      <$> ( ifM (match [FUN]) (parseFunction "function") $
-              ifM
-                (match [VAR])
-                parseVarDeclaration
-                parseStatement
-          )
+      <$> ifM
+        (match [FUN])
+        (parseFunction "function")
+        ( ifM
+            (match [VAR])
+            parseVarDeclaration
+            parseStatement
+        )
   )
     `catch` \(ParseError _ _) -> Nothing <$ synchronize
 
@@ -190,12 +192,12 @@ parseCall :: StateT ParseState Lox Expr
 parseCall = do
   expr <- parsePrimary
   res <- runExceptT $ flip iterateM_ expr $ \expr' -> do
-    ifM (match [LEFT_PAREN]) (lift $ finishCall expr') (throwError expr)
+    ifM (match [LEFT_PAREN]) (lift $ finishCall expr') (throwError expr')
   pure (fromEither res)
 
 finishCall :: Expr -> StateT ParseState Lox Expr
 finishCall callee = do
-  arguments <- ifM (not <$> check RIGHT_PAREN) (parseExpression `untilM` match [COMMA]) (pure [])
+  arguments <- ifM (not <$> check RIGHT_PAREN) (parseExpression `untilM` (not <$> match [COMMA])) (pure [])
   paren <- consume RIGHT_PAREN "Expect ')' after arguments."
   when (length arguments >= 255) $ do
     t <- peek

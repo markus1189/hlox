@@ -5,6 +5,7 @@ import Control.Monad.Except (runExceptT)
 import Control.Monad.Extra (whenM)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.State (evalStateT)
+import Control.Monad.Trans.Writer (WriterT (runWriterT))
 import Data.Foldable (for_, traverse_)
 import Data.String.Conversions (convertString)
 import Data.Text (Text)
@@ -20,7 +21,6 @@ import HLox.Util
 import Streaming.Prelude qualified as S
 import System.Environment (getArgs)
 import System.Exit (ExitCode (ExitFailure), exitWith)
-import Control.Monad.Trans.Writer (WriterT(runWriterT))
 
 main :: IO ()
 main = do
