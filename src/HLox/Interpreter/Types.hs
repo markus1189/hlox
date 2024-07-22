@@ -14,6 +14,8 @@ import Data.Text (Text)
 import Formatting (sformat, shortest)
 import HLox.Pretty (Pretty, pretty)
 import HLox.Scanner.Types
+import Numeric.Natural (Natural)
+import Data.String.Interpolate (i)
 
 data LoxStmtValue
   = LoxStmtVoid
@@ -26,7 +28,7 @@ data LoxValue
   | LoxText !Text
   | LoxNumber !Double
   | LoxBool !Bool
-  | LoxFun !Text !([LoxValue] -> IO LoxValue)
+  | LoxFun !Text !Natural !([LoxValue] -> IO LoxValue)
 
 makePrisms ''LoxValue
 
@@ -38,7 +40,7 @@ instance Eq LoxValue where
   LoxText t1 == LoxText t2 = t1 == t2
   LoxNumber n1 == LoxNumber n2 = n1 == n2
   LoxBool b1 == LoxBool b2 = b1 == b2
-  LoxFun _ _ == LoxFun _ _ = False
+  LoxFun _ _ _ == LoxFun _ _ _ = False
   _ == _ = False
 
 instance Pretty LoxValue where
@@ -50,7 +52,7 @@ stringify (LoxNumber n) = sformat shortest n
 stringify (LoxText t) = t
 stringify (LoxBool True) = "true"
 stringify (LoxBool False) = "false"
-stringify (LoxFun name _) = "<fn " <> name <> ">"
+stringify (LoxFun arity name _) = [i|<fn #{arity} "#{name}">|]
 
 data InterpretError = InterpretError !Token !Text
   deriving (Show, Eq)
@@ -86,7 +88,7 @@ instance At Environment where
       set :: Environment -> Maybe LoxValue -> Environment
       set (Environment es) (Just v) = case findIndex (Map.member name) es of
         Nothing -> Environment $ es & _head %~ (at name ?~ v)
-        Just i -> Environment $ es & ix i %~ at name ?~ v
+        Just x -> Environment $ es & ix x %~ at name ?~ v
       set env@(Environment es) Nothing = case findIndex (Map.member name) es of
         Nothing -> env
-        Just i -> Environment $ es & ix i %~ at name .~ Nothing
+        Just x -> Environment $ es & ix x %~ at name .~ Nothing

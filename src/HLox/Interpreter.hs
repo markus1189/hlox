@@ -6,7 +6,7 @@ import Control.Lens.Combinators (to, use)
 import Control.Lens.Operators ((%=), (?=), (^.), (^?))
 import Control.Monad.Error.Class (liftEither)
 import Control.Monad.Except (MonadError (throwError), runExceptT)
-import Control.Monad.IO.Class ( liftIO, MonadIO )
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Loops (whileM)
 import Control.Monad.RWS (MonadState)
 import Control.Monad.State (evalStateT)
@@ -16,11 +16,13 @@ import Data.Maybe (fromMaybe)
 import Data.String.Interpolate (i)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TIO
+import GHC.Num.Natural (Natural)
 import HLox.Interpreter.Types
 import HLox.Parser.Types (Expr (..), Stmt (..))
 import HLox.Scanner.Types
 import HLox.Types (Lox)
 import HLox.Util (loxRuntimeError)
+import Control.Monad (unless)
 
 eval :: (Traversable t) => t Stmt -> Lox ()
 eval stmts = do
@@ -132,12 +134,17 @@ interpret (ExprLogical lhs op rhs) = do
 interpret (ExprCall callee paren arguments) = do
   callee' <- interpret callee
   args <- traverse interpret arguments
+  checkArity paren (length args) callee'
   let function = callee'
   call paren function args
 
 call :: (MonadIO m, MonadError InterpretError m) => Token -> LoxValue -> [LoxValue] -> m LoxValue
-call _ (LoxFun _ fn) args = liftIO $ fn args
+call _ (LoxFun _ _ fn) args = liftIO $ fn args
 call paren _ _ = throwError (InterpretError paren "Can only call functions and classes.")
+
+checkArity :: (MonadError InterpretError m) => Token -> Int -> LoxValue -> m ()
+checkArity paren a1 (LoxFun _ a2 _) = unless (a1 == fromIntegral a2) $ throwError (InterpretError paren [i|Expected #{a2} arguments but got #{a1}.|])
+checkArity _ _ _ = pure ()
 
 isTruthy :: LoxValue -> Bool
 isTruthy LoxNil = False
