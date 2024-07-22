@@ -12,11 +12,12 @@ import Data.Map.Strict qualified as Map
 import Data.Maybe (isJust)
 import Data.String.Interpolate (i)
 import Data.Text (Text)
-import Data.Time.Clock.POSIX (getPOSIXTime)
 import Formatting (sformat, shortest)
 import HLox.Pretty (Pretty, pretty)
 import HLox.Scanner.Types
-import Numeric.Natural (Natural)
+import HLox.Parser.Types (Stmt)
+
+data LoxNativeFunKind = LoxClock deriving (Show, Eq, Ord)
 
 data LoxStmtValue
   = LoxStmtVoid
@@ -29,20 +30,11 @@ data LoxValue
   | LoxText !Text
   | LoxNumber !Double
   | LoxBool !Bool
-  | LoxFun !Text !Natural !([LoxValue] -> IO LoxValue)
+  | LoxFun ![Text] ![Stmt]
+  | LoxNativeFun !LoxNativeFunKind
+  deriving (Show, Eq, Ord)
 
 makePrisms ''LoxValue
-
-instance Show LoxValue where
-  show = show . pretty
-
-instance Eq LoxValue where
-  LoxNil == LoxNil = True
-  LoxText t1 == LoxText t2 = t1 == t2
-  LoxNumber n1 == LoxNumber n2 = n1 == n2
-  LoxBool b1 == LoxBool b2 = b1 == b2
-  LoxFun _ _ _ == LoxFun _ _ _ = False
-  _ == _ = False
 
 instance Pretty LoxValue where
   pretty = stringify
@@ -53,7 +45,8 @@ stringify (LoxNumber n) = sformat shortest n
 stringify (LoxText t) = t
 stringify (LoxBool True) = "true"
 stringify (LoxBool False) = "false"
-stringify (LoxFun arity name _) = [i|<fn #{arity} "#{name}">|]
+stringify (LoxFun _ _) = "<function>"
+stringify (LoxNativeFun k) = [i|<native function: #{show k}>|]
 
 data InterpretError = InterpretError !Token !Text
   deriving (Show, Eq)
@@ -63,15 +56,7 @@ newtype Environment = Environment [Map Text LoxValue]
 makePrisms ''Environment
 
 initialEnv :: Environment
-initialEnv =
-  Environment
-    [ Map.fromList
-        [("clock", clockFun)]
-    ]
-  where
-    clockFun = LoxFun "clock" 0 $ \_ -> do
-      time <- realToFrac <$> getPOSIXTime
-      pure $ LoxNumber time
+initialEnv = Environment [ Map.fromList [("clock", LoxNativeFun LoxClock)]]
 
 pushEnv :: Environment -> Environment
 pushEnv (Environment es) = Environment (mempty : es)

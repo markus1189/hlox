@@ -2,8 +2,16 @@ module HLox.Interpreter (interpret, eval, evalPure) where
 
 import Control.Applicative ((<|>))
 import Control.Lens (at)
-import Control.Lens.Combinators (to, use)
-import Control.Lens.Operators ((%=), (?=), (^.), (^?))
+import Control.Lens.Combinators (to, use, view)
+import Control.Lens.Operators
+  ( (%=),
+    (&),
+    (?=),
+    (?~),
+    (^.),
+    (^?),
+  )
+import Control.Monad (unless, void)
 import Control.Monad.Error.Class (liftEither)
 import Control.Monad.Except (MonadError (throwError), runExceptT)
 import Control.Monad.IO.Class (MonadIO, liftIO)
@@ -12,26 +20,27 @@ import Control.Monad.RWS (MonadState)
 import Control.Monad.State (evalStateT)
 import Data.Either.Combinators (maybeToRight)
 import Data.Foldable (for_, traverse_)
+import Data.List (foldl')
 import Data.Maybe (fromMaybe)
 import Data.String.Interpolate (i)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TIO
+import Data.Time.Clock.POSIX (getPOSIXTime)
 import HLox.Interpreter.Types
 import HLox.Parser.Types (Expr (..), Stmt (..))
 import HLox.Scanner.Types
 import HLox.Types (Lox)
 import HLox.Util (loxRuntimeError)
-import Control.Monad (unless)
 
 eval :: (Traversable t) => t Stmt -> Lox ()
 eval stmts = do
-  r <- runExceptT $ evalPure stmts
+  r <- runExceptT $ evalPure initialEnv stmts
   case r of
     Left err -> loxRuntimeError err
     Right stmtValues -> liftIO $ for_ stmtValues execute
 
-evalPure :: (Traversable t, MonadIO m, MonadError InterpretError m) => t Stmt -> m (t LoxStmtValue)
-evalPure stmts = evalStateT (traverse executePure stmts) initialEnv
+evalPure :: (Traversable t, MonadIO m, MonadError InterpretError m) => Environment -> t Stmt -> m (t LoxStmtValue)
+evalPure env stmts = evalStateT (traverse executePure stmts) env
   where
     executePure (StmtIf c t f) = do
       c' <- interpret c
@@ -55,9 +64,12 @@ evalPure stmts = evalStateT (traverse executePure stmts) initialEnv
       xs <- traverse executePure stmts'
       id %= popEnv
       pure (LoxStmtBlock xs)
-    executePure (StmtWhile cond body) = do
-      LoxStmtBlock <$> whileM (isTruthy <$> interpret cond) (executePure body)
-    executePure (StmtFunction _ _ _) = pure LoxStmtVoid
+    executePure (StmtWhile cond body) = LoxStmtBlock <$> whileM (isTruthy <$> interpret cond) (executePure body)
+    executePure (StmtFunction name params body) = do
+      let f = LoxFun (map (view (lexeme . _Lexeme)) params) body
+          name' = view (lexeme . _Lexeme) name
+      at name' ?= f
+      pure LoxStmtVoid
 
 execute :: LoxStmtValue -> IO ()
 execute LoxStmtVoid = pure ()
@@ -127,7 +139,7 @@ interpret (ExprVariable name) = do
 --
 interpret (ExprLogical lhs op rhs) = do
   left <- interpret lhs
-  if (op ^. tokenType == OR && isTruthy left) || (op ^. tokenType == AND && not (isTruthy left))
+  if op ^. tokenType == OR && isTruthy left || op ^. tokenType == AND && not (isTruthy left)
     then pure left
     else interpret rhs
 --
@@ -138,12 +150,18 @@ interpret (ExprCall callee paren arguments) = do
   let function = callee'
   call paren function args
 
-call :: (MonadIO m, MonadError InterpretError m) => Token -> LoxValue -> [LoxValue] -> m LoxValue
-call _ (LoxFun _ _ fn) args = liftIO $ fn args
+call :: (MonadIO m, MonadError InterpretError m, MonadState Environment m) => Token -> LoxValue -> [LoxValue] -> m LoxValue
+call _ (LoxFun params body) args = do
+  let kvs = params `zip` args
+      env = foldl' (\acc (k, v) -> acc & at k ?~ v) initialEnv kvs
+  void $ evalPure env body
+  pure LoxNil
+call _ (LoxNativeFun LoxClock) _ = LoxNumber . realToFrac <$> liftIO getPOSIXTime
 call paren _ _ = throwError (InterpretError paren "Can only call functions and classes.")
 
 checkArity :: (MonadError InterpretError m) => Token -> Int -> LoxValue -> m ()
-checkArity paren a1 (LoxFun _ a2 _) = unless (a1 == fromIntegral a2) $ throwError (InterpretError paren [i|Expected #{a2} arguments but got #{a1}.|])
+checkArity paren a1 (LoxFun a2 _) = unless (a1 == length a2) $ throwError (InterpretError paren [i|Expected #{length a2} arguments but got #{a1}.|])
+checkArity paren a1 (LoxNativeFun LoxClock) = unless (a1 == 0) $ throwError (InterpretError paren [i|Expected 0 arguments but got #{a1}.|])
 checkArity _ _ _ = pure ()
 
 isTruthy :: LoxValue -> Bool
