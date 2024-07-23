@@ -67,7 +67,7 @@ spec_environment = do
 
 spec_interpreterExpr :: SpecWith ()
 spec_interpreterExpr = do
-  describe "Interpreter" $ do
+  describe "Interpreter (Expr)" $ do
     describe "valid expressions" $ do
       it "should evaluate boolean expression" $ do
         result <- interpretExpr' "1 + 5 < 3 * 3"
@@ -96,7 +96,7 @@ spec_interpreterExpr = do
 
 spec_interpreterStmt :: SpecWith ()
 spec_interpreterStmt = do
-  describe "Interpreter" $ do
+  describe "Interpreter (Stmt)" $ do
     describe "valid statements" $ do
       it "should handle variables" $ do
         result <- interpretStmt' "var a = 1; var b = 2; print a + b;"
@@ -138,64 +138,89 @@ spec_interpreterStmt = do
         result <- interpretStmt' program
         result `shouldBe` Right [LoxEffectPrint "Hi, Dear Reader!"]
 
-      it "should handle fibonacci" $ do
-        let program =
-              [i|fun fib(n) {
-                   if (n <= 1) return n;
-                   return fib(n - 2) + fib(n - 1);
+
+spec_interpreterPrograms :: SpecWith ()
+spec_interpreterPrograms = do
+  describe "Interpreter Programs" $ do
+    it "should handle fibonacci" $ do
+      let program =
+            [i|fun fib(n) {
+                 if (n <= 1) return n;
+                 return fib(n - 2) + fib(n - 1);
+               }
+               for (var i = 0; i < 20; i = i + 1) {
+                 print fib(i);
+               }
+            |]
+      result <- interpretStmt' program
+      result
+        `shouldBe` Right
+          [ LoxEffectPrint "0",
+            LoxEffectPrint "1",
+            LoxEffectPrint "1",
+            LoxEffectPrint "2",
+            LoxEffectPrint "3",
+            LoxEffectPrint "5",
+            LoxEffectPrint "8",
+            LoxEffectPrint "13",
+            LoxEffectPrint "21",
+            LoxEffectPrint "34",
+            LoxEffectPrint "55",
+            LoxEffectPrint "89",
+            LoxEffectPrint "144",
+            LoxEffectPrint "233",
+            LoxEffectPrint "377",
+            LoxEffectPrint "610",
+            LoxEffectPrint "987",
+            LoxEffectPrint "1597",
+            LoxEffectPrint "2584",
+            LoxEffectPrint "4181"
+          ]
+
+    it "should handle closures (makeCounter)" $ do
+      -- This one forced mutable environments for variables
+      let program =
+            [i|fun makeCounter() {
+                 var i = 0;
+
+                 fun count() {
+                   i = i + 1;
+                   print i;
                  }
-                 for (var i = 0; i < 20; i = i + 1) {
-                   print fib(i);
-                 }
-              |]
-        result <- interpretStmt' program
-        result
-          `shouldBe` Right
-            [ LoxEffectPrint "0",
-              LoxEffectPrint "1",
-              LoxEffectPrint "1",
-              LoxEffectPrint "2",
-              LoxEffectPrint "3",
-              LoxEffectPrint "5",
-              LoxEffectPrint "8",
-              LoxEffectPrint "13",
-              LoxEffectPrint "21",
-              LoxEffectPrint "34",
-              LoxEffectPrint "55",
-              LoxEffectPrint "89",
-              LoxEffectPrint "144",
-              LoxEffectPrint "233",
-              LoxEffectPrint "377",
-              LoxEffectPrint "610",
-              LoxEffectPrint "987",
-              LoxEffectPrint "1597",
-              LoxEffectPrint "2584",
-              LoxEffectPrint "4181"
-            ]
 
-      it "should handle closures (makeCounter)" $ do
-        let program =
-              [i|fun makeCounter() {
-                   var i = 0;
+                 return count;
+               }
 
-                   fun count() {
-                     i = i + 1;
-                     print i;
-                   }
+               var counter = makeCounter();
+               counter();
+               counter();
+            |]
+      result <- interpretStmt' program
+      result
+        `shouldBe` Right
+          [ LoxEffectPrint "1",
+            LoxEffectPrint "2"
+          ]
 
-                   return count;
+    it "have lexical scoping" $ do
+      let program =
+            [i|var a = "global";
+               {
+                 fun showA() {
+                   print a;
                  }
 
-                 var counter = makeCounter();
-                 counter();
-                 counter();
-              |]
-        result <- interpretStmt' program
-        result
-          `shouldBe` Right
-            [ LoxEffectPrint "1",
-              LoxEffectPrint "2"
-            ]
+                 showA();
+                 var a = "block";
+                 showA();
+               }
+            |]
+      result <- interpretStmt' program
+      result
+        `shouldBe` Right
+          [ LoxEffectPrint "global",
+            LoxEffectPrint "global"
+          ]
 
 interpretExpr' :: Text -> IO (Either InterpretError (LoxValue, [LoxEffect]))
 interpretExpr' input = do
