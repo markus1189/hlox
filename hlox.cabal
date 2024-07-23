@@ -38,14 +38,15 @@ common deps
 common options
     ghc-options: -Wall -threaded -Werror=incomplete-patterns
     default-language: GHC2021
-    default-extensions: LambdaCase
+    default-extensions: FunctionalDependencies
+                      , LambdaCase
+                      , LambdaCase
                       , OverloadedStrings
+                      , QuasiQuotes
                       , TemplateHaskell
                       , TupleSections
-                      , ViewPatterns
-                      , QuasiQuotes
-                      , LambdaCase
                       , TypeFamilies
+                      , ViewPatterns
 
 library
     import:           options
@@ -57,6 +58,8 @@ library
                     , HLox.Parser
                     , HLox.Parser.Types
                     , HLox.Pretty
+                    , HLox.Resolver
+                    , HLox.Resolver.Types
                     , HLox.Scanner
                     , HLox.Scanner.Types
                     , HLox.Types

@@ -1,12 +1,13 @@
+{-# OPTIONS_GHC -Wno-deferred-out-of-scope-variables #-}
 module HLox.Interpreter.Test where
 
 import           Control.Lens.Lens ((<&>))
 import           Control.Monad.Except (runExceptT)
 import           Control.Monad.State (evalStateT)
-import           Control.Monad.Writer (execWriterT, runWriterT)
+import           Control.Monad.Writer (execWriterT)
 import           Data.String.Interpolate (i)
 import           Data.Text (Text)
-import           HLox.Interpreter (evalPure, interpret)
+import           HLox.Interpreter (evalPure, evalExpr)
 import qualified HLox.Interpreter.Environment as Env
 import           HLox.Interpreter.Types
 import           HLox.Parser (parse, parseExpr)
@@ -14,6 +15,8 @@ import           HLox.Scanner (scanTokens)
 import           HLox.Scanner.Types
 import           HLox.Types
 import           Test.Hspec (SpecWith, describe, it, shouldBe)
+import HLox.Resolver.Types (DepthMap(..))
+import HLox.Resolver (resolve)
 
 spec_environment :: SpecWith ()
 spec_environment = do
@@ -70,29 +73,29 @@ spec_interpreterExpr = do
   describe "Interpreter (Expr)" $ do
     describe "valid expressions" $ do
       it "should evaluate boolean expression" $ do
-        result <- interpretExpr' "1 + 5 < 3 * 3"
-        result `shouldBe` Right (LoxBool True, [])
+        result <- evalExpr' "1 + 5 < 3 * 3"
+        result `shouldBe` Right (LoxBool True)
       it "should evaluate number expression " $ do
-        result <- interpretExpr' "42 * 2"
-        result `shouldBe` Right (LoxNumber 84, [])
+        result <- evalExpr' "42 * 2"
+        result `shouldBe` Right (LoxNumber 84)
       it "should concatenate strings" $ do
-        result <- interpretExpr' [i|"Hello" + " " + "World"|]
-        result `shouldBe` Right (LoxText "Hello World", [])
+        result <- evalExpr' [i|"Hello" + " " + "World"|]
+        result `shouldBe` Right (LoxText "Hello World")
       it "should stringify lhs operands" $ do
-        result <- interpretExpr' [i|42 + "!"|]
-        result `shouldBe` Right (LoxText "42!", [])
+        result <- evalExpr' [i|42 + "!"|]
+        result `shouldBe` Right (LoxText "42!")
       it "should stringify rhs operands" $ do
-        result <- interpretExpr' [i|"Answer: " + 42|]
-        result `shouldBe` Right (LoxText "Answer: 42", [])
+        result <- evalExpr' [i|"Answer: " + 42|]
+        result `shouldBe` Right (LoxText "Answer: 42")
       it "should evaluate logical and operators" $ do
-        result <- interpretExpr' "true and false"
-        result `shouldBe` Right (LoxBool False, [])
+        result <- evalExpr' "true and false"
+        result `shouldBe` Right (LoxBool False)
       it "should evaluate logical or operators" $ do
-        result <- interpretExpr' "false or true"
-        result `shouldBe` Right (LoxBool True, [])
+        result <- evalExpr' "false or true"
+        result `shouldBe` Right (LoxBool True)
       it "should preserve values based on truthiness" $ do
-        result <- sequenceA <$> traverse interpretExpr' [[i|"strings are true" or true|], [i|false or 42|]]
-        result `shouldBe` Right [(LoxText "strings are true", []), (LoxNumber 42, [])]
+        result <- sequenceA <$> traverse evalExpr' [[i|"strings are true" or true|], [i|false or 42|]]
+        result `shouldBe` Right [LoxText "strings are true", LoxNumber 42]
 
 spec_interpreterStmt :: SpecWith ()
 spec_interpreterStmt = do
@@ -222,13 +225,13 @@ spec_interpreterPrograms = do
             LoxEffectPrint "global"
           ]
 
-interpretExpr' :: Text -> IO (Either InterpretError (LoxValue, [LoxEffect]))
-interpretExpr' input = do
+evalExpr' :: Text -> IO (Either InterpretError LoxValue)
+evalExpr' input = do
   loxEnv <- makeLoxEnv
   env <- Env.global
   let (tokens, _) = scanTokens input
   Right result <- flip runLox loxEnv $ parseExpr tokens
-  runExceptT $ runWriterT $ evalStateT (interpret result) env
+  evalExpr (DepthMap mempty) env result
 
 interpretStmt' :: Text -> IO (Either InterpretError [LoxEffect])
 interpretStmt' input = do
@@ -236,4 +239,5 @@ interpretStmt' input = do
   env <- Env.global
   let (tokens, _) = scanTokens input
   Right result <- flip runLox loxEnv $ parse tokens
-  runExceptT $ execWriterT $ flip evalStateT env $ evalPure result
+  let (dm, []) = resolve result
+  runExceptT $ execWriterT $ flip evalStateT (InterpreterState env dm) $ evalPure result

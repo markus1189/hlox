@@ -1,70 +1,122 @@
 module HLox.Resolver (resolve) where
 
-import Control.Lens (makePrisms, _Cons)
-import Control.Lens.Combinators (at, view, _head, ix, use)
-import Control.Lens.Cons (Cons)
-import Control.Lens.Operators ((%=), (<&>), (?=), (^.))
-import Control.Monad.Extra (andM, ifM, unlessM, whenM)
+import Control.Lens.Combinators
+  ( at,
+    ix,
+    preuse,
+    to,
+    use,
+    view,
+    _head,
+  )
+import Control.Lens.Operators ((%=), (?=), (^.))
+import Control.Lens.TH (makeFields)
+import Control.Monad.RWS.Strict (runRWS)
 import Control.Monad.State.Class (MonadState)
-import Data.Foldable (traverse_)
+import Control.Monad.Writer.Class (MonadWriter, tell)
+import Data.Foldable (for_, traverse_)
+import Data.List (findIndex)
 import Data.Map.Strict (Map)
+import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import HLox.Parser.Types
+import HLox.Resolver.Types
 import HLox.Scanner.Types
-import Control.Lens.Combinators (preuse)
-import Control.Monad.Writer.Class (tell, MonadWriter)
 
-newtype ScopeStack = ScopeStack [Map Text Bool] deriving (Show, Eq, Ord)
+data ResolverState = ResolverState
+  { resolverStateScopeStack :: !ScopeStack,
+    resolverStateDepthMap :: !DepthMap
+  }
 
-data ResolverError = ResolverError !Token !Text deriving (Show, Eq)
-
-makePrisms ''ScopeStack
+makeFields ''ResolverState
 
 scopeEmpty :: ScopeStack -> Bool
 scopeEmpty (ScopeStack []) = True
 scopeEmpty (ScopeStack (_ : _)) = False
 
-scopePeek :: ScopeStack -> Maybe (Map Text Bool)
+scopePeek :: ScopeStack -> Maybe (Map Text InitializeStatus)
 scopePeek (ScopeStack []) = Nothing
 scopePeek (ScopeStack (x : _)) = Just x
 
--- resolve :: (Foldable t, MonadState ScopeStack m) => t Stmt -> m _
-resolve = traverse_ resolve1
+resolve :: (Foldable t) => t Stmt -> (DepthMap, [ResolverError])
+resolve stmts = pick $ runRWS (resolveAll stmts) () (ResolverState (ScopeStack mempty) (DepthMap mempty))
+  where
+    pick (_, s, w) = (view depthMap s, w)
 
-resolve1 :: (MonadState ScopeStack m) => Stmt a -> m ()
-resolve1 (StmtVar n initializer) = do
+resolveAll :: (Foldable t, HasDepthMap s DepthMap, HasScopeStack s ScopeStack, MonadWriter [ResolverError] m, MonadState s m) => t Stmt -> m ()
+resolveAll = traverse_ resolve1
+
+resolve1 :: (HasDepthMap s DepthMap, HasScopeStack s ScopeStack, MonadWriter [ResolverError] m, MonadState s m) => Stmt -> m ()
+resolve1 (StmtVar _ n initializer) = do
   declare n
   traverse_ resolveExpr initializer
   define n
-resolve1 _ = pure ()
+resolve1 (StmtFunction _ name ps body) = do
+  declare name
+  define name
+  resolveFunction ps body
+resolve1 (StmtExpr _ expr) = resolveExpr expr
+resolve1 (StmtIf _ cond ifTrue ifFalse) = do
+  resolveExpr cond
+  resolve1 ifTrue
+  traverse_ resolve1 ifFalse
+resolve1 (StmtPrint _ expr) = resolveExpr expr
+resolve1 (StmtReturn _ _ expr) = traverse_ resolveExpr expr
+resolve1 (StmtWhile _ c body) = resolveExpr c >> resolve1 body
+resolve1 (StmtBlock _ stmts) = do
+  beginScope
+  resolveAll stmts
+  endScope
 
-resolveExpr :: (MonadWriter [ResolverError] m, MonadState ScopeStack m) => Expr -> m ()
-resolveExpr expr@(ExprVariable n) = do
-  scopesAreEmpty <- scopeEmpty <$> use id
-  uninitialized <- (== Just False) <$> preuse (_ScopeStack . _head . ix n')
+resolveFunction :: (HasDepthMap s DepthMap, HasScopeStack s ScopeStack, MonadWriter [ResolverError] m, MonadState s m) => [Token] -> [Stmt] -> m ()
+resolveFunction params body = do
+  beginScope
+  for_ params $ \param -> do
+    declare param
+    define param
+  resolveAll body
+  endScope
+
+resolveExpr :: (HasDepthMap s DepthMap, HasScopeStack s ScopeStack, MonadWriter [ResolverError] m, MonadState s m) => Expr -> m ()
+resolveExpr expr@(ExprVariable _ n) = do
+  scopesAreEmpty <- scopeEmpty <$> use scopeStack
+  uninitialized <- (== Just Uninitialized) <$> preuse (scopeStack . _ScopeStack . _head . ix n')
   if not scopesAreEmpty && uninitialized
     then tell [ResolverError n "Cannot read local variable in its own initializer"]
     else resolveLocal expr n
   where
     n' = view (lexeme . _Lexeme) n
-resolveExpr _ = pure ()
+resolveExpr expr@(ExprAssign _ name value) = do
+  resolveExpr value
+  resolveLocal expr name
+resolveExpr (ExprBinary _ lhs _ rhs) = resolveExpr lhs *> resolveExpr rhs
+resolveExpr (ExprCall _ callee _ arguments) = do
+  resolveExpr callee
+  traverse_ resolveExpr arguments
+resolveExpr (ExprGrouping _ expr) = resolveExpr expr
+resolveExpr (ExprLiteral _ _) = pure ()
+resolveExpr (ExprLogical _ lhs _ rhs) = resolveExpr lhs *> resolveExpr rhs
+resolveExpr (ExprUnary _ _ expr) = resolveExpr expr
 
-beginScope :: (MonadState ScopeStack m) => m ()
-beginScope = _ScopeStack %= (mempty :)
+beginScope :: (HasScopeStack s ScopeStack, MonadState s m) => m ()
+beginScope = scopeStack . _ScopeStack %= (mempty :)
 
-endScope :: (MonadState ScopeStack m) => m ()
+endScope :: (HasScopeStack s ScopeStack, MonadState s m) => m ()
 endScope =
-  _ScopeStack %= \case
+  scopeStack . _ScopeStack %= \case
     [] -> []
     (_ : xs) -> xs
 
-declare :: (MonadState ScopeStack m) => Token -> m ()
-declare n = _ScopeStack . _head . at (n ^. lexeme . _Lexeme) ?= False
+declare :: (HasScopeStack s ScopeStack, MonadState s m) => Token -> m ()
+declare n = scopeStack . _ScopeStack . _head . at (n ^. lexeme . _Lexeme) ?= Uninitialized
 
-define :: (MonadState ScopeStack m) => Token -> m ()
-define n = _ScopeStack . _head . at (n ^. lexeme . _Lexeme) ?= True
+define :: (HasScopeStack s ScopeStack, MonadState s m) => Token -> m ()
+define n = scopeStack . _ScopeStack . _head . at (n ^. lexeme . _Lexeme) ?= Initialized
 
-resolveLocal :: (MonadWriter [ResolverError] m, MonadState ScopeStack m) => Expr -> Token -> m ()
+resolveLocal :: (HasDepthMap s DepthMap, HasScopeStack s ScopeStack, MonadWriter [ResolverError] m, MonadState s m) => Expr -> Token -> m ()
 resolveLocal expr name = do
-  pure ()
-  where name' = view (lexeme . _Lexeme) name
+  maybeDepth <- use (scopeStack . to (findDepth name))
+  for_ maybeDepth $ \i -> depthMap . _DepthMap %= Map.insert (expr ^. exprId) i
+
+findDepth :: Token -> ScopeStack -> Maybe Int
+findDepth (view (lexeme . _Lexeme) -> name) (ScopeStack ss) = (\i -> length ss - 1 - i) <$> findIndex (Map.member name) (reverse ss)

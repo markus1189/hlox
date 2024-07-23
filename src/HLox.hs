@@ -1,26 +1,26 @@
 module HLox (main) where
 
 import Control.Lens (view)
-import Control.Monad.Except (runExceptT)
 import Control.Monad.Extra (whenM)
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.State (evalStateT)
-import Control.Monad.Trans.Writer (WriterT (runWriterT))
-import Data.Foldable (for_, traverse_)
+import Data.Foldable (for_)
 import Data.String.Conversions (convertString)
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TIO
-import HLox.Interpreter (eval, interpret)
+import HLox.Interpreter (eval, evalExpr)
+import HLox.Interpreter.Environment qualified as Env
 import HLox.Parser (parse, parseExpr, pretty)
+import HLox.Resolver (resolve)
+import HLox.Resolver.Types (ResolverError (..), DepthMap (DepthMap))
 import HLox.Scanner (TokenType (SEMICOLON), scanTokens)
-import HLox.Scanner.Types (ScanError (..), tokenType)
+import HLox.Scanner.Types (ScanError (..), tokenType, line)
 import HLox.Types (Lox, makeLoxEnv, runLox)
 import HLox.Util
 import Streaming.Prelude qualified as S
 import System.Environment (getArgs)
 import System.Exit (ExitCode (ExitFailure), exitWith)
-import qualified HLox.Interpreter.Environment as Env
+import HLox.Interpreter.Types (InterpretError(..))
 
 main :: IO ()
 main = do
@@ -54,8 +54,8 @@ runPrompt = do
   liftIO $ TIO.putStrLn "Goodbye"
   where
     mapper :: Text -> Lox ()
-    mapper line = do
-      run line
+    mapper l = do
+      run l
       loxWriteHadError False
 
 run :: Text -> Lox ()
@@ -70,14 +70,24 @@ run script = do
           case parseResult of
             Left _ -> pure ()
             Right stmts -> do
-              env <- Env.global
-              eval env stmts
+              let (dm, errors) = resolve stmts
+              if not $ null errors
+                then do
+                  liftIO $ TIO.putStrLn "There were resolver errors:"
+                  for_ errors $ \(ResolverError t msg) -> loxError (view line t) msg
+                else do
+                  env <- Env.global
+                  eval dm env stmts
         else do
           parseResult <- parseExpr tokens
-          for_ parseResult $ \stmts -> do
+          for_ parseResult $ \expr -> do
+            let dm = DepthMap mempty
             env <- Env.global
-            result <- fmap (fmap fst) $ runExceptT $ runWriterT $ flip evalStateT env (interpret stmts)
-            traverse_ (liftIO . TIO.putStrLn . pretty) result
+            result <- evalExpr dm env expr
+            case result of
+              Left (InterpretRuntimeError (view line -> l) msg) -> loxError l msg
+              Left (InterpretReturn _) -> loxError (-1) "Invalid return while evaluating expression."
+              Right v -> liftIO . TIO.putStrLn . pretty $ v
     scanErrs -> do
       liftIO $ TIO.putStrLn "There were scan errors:"
       for_ scanErrs $ \(ScanError l msg) -> loxError l msg

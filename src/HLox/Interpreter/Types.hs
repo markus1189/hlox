@@ -1,6 +1,6 @@
 module HLox.Interpreter.Types where
 
-import Control.Lens.TH (makePrisms)
+import Control.Lens.TH (makePrisms, makeFields)
 import Data.HashTable.IO qualified as H
 import Data.List.NonEmpty (NonEmpty)
 import Data.String.Interpolate (i)
@@ -9,6 +9,7 @@ import Formatting (sformat, shortest)
 import HLox.Parser.Types (Stmt)
 import HLox.Pretty (Pretty, pretty)
 import HLox.Scanner.Types (Token)
+import HLox.Resolver.Types (DepthMap)
 
 type HashTable k v = H.CuckooHashTable k v
 
@@ -53,3 +54,10 @@ instance Ord Environment where
 
 makePrisms ''LoxValue
 makePrisms ''Environment
+
+data InterpreterState = InterpreterState
+  { interpreterStateEnvironment :: Environment,
+    interpreterStateDepthMap :: DepthMap
+  }
+
+makeFields ''InterpreterState

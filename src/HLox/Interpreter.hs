@@ -1,7 +1,7 @@
-module HLox.Interpreter (interpret, eval, evalPure) where
+module HLox.Interpreter (eval, evalPure, evalExpr) where
 
 import Control.Applicative ((<|>))
-import Control.Lens.Combinators (to, use, view)
+import Control.Lens.Combinators (at, to, use, view)
 import Control.Lens.Operators
   ( (%=),
     (.=),
@@ -25,21 +25,39 @@ import Data.String.Interpolate (i)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TIO
 import Data.Time.Clock.POSIX (getPOSIXTime)
+import Data.UUID (UUID)
+import HLox.Interpreter.Environment (assignAt, assignGlobal)
+import HLox.Interpreter.Environment qualified as Env
 import HLox.Interpreter.Types
-import HLox.Parser.Types (Expr (..), Stmt (..))
+import HLox.Parser.Types (Expr (..), Stmt (..), exprId)
+import HLox.Resolver.Types
 import HLox.Scanner.Types
 import HLox.Types (Lox)
 import HLox.Util (loxRuntimeError)
-import qualified HLox.Interpreter.Environment as Env
 
-eval :: (Traversable t) => Environment -> t Stmt -> Lox ()
-eval env stmts = do
-  r <- runExceptT $ runWriterT $ flip evalStateT env $ evalPure stmts
+eval :: (Traversable t) => DepthMap -> Environment -> t Stmt -> Lox ()
+eval dm env stmts = do
+  r <- runExceptT $ runWriterT $ flip evalStateT (InterpreterState env dm) $ evalPure stmts
   case r of
     Left err -> loxRuntimeError err
     Right (_, effs) -> do liftIO $ for_ effs runEffect
 
-evalPure :: (Traversable t, MonadIO m, MonadState Environment m, MonadError InterpretError m, MonadWriter [LoxEffect] m) => t Stmt -> m ()
+evalExpr :: (MonadIO m) => DepthMap -> Environment -> Expr -> m (Either InterpretError LoxValue)
+evalExpr dm env e = do
+  r <- runExceptT $ runWriterT @[LoxEffect] $ flip evalStateT (InterpreterState env dm) $ interpret e
+  pure $ fmap fst r
+
+evalPure ::
+  ( Traversable t,
+    MonadIO m,
+    HasDepthMap s DepthMap,
+    HasEnvironment s Environment,
+    MonadState s m,
+    MonadError InterpretError m,
+    MonadWriter [LoxEffect] m
+  ) =>
+  t Stmt ->
+  m ()
 evalPure = traverse_ executePure
   where
     executePure (StmtIf _ c t f) = do
@@ -53,22 +71,22 @@ evalPure = traverse_ executePure
       tell [LoxEffectPrint $ stringify x]
     executePure (StmtVar _ name Nothing) = do
       let name' = name ^. lexeme . _Lexeme
-      env <- use id
+      env <- use environment
       Env.define env name' LoxNil
     executePure (StmtVar _ name (Just initializer)) = do
       v <- interpret initializer
       let name' = name ^. lexeme . _Lexeme
-      env <- use id
+      env <- use environment
       Env.define env name' v
     executePure (StmtBlock _ stmts') = do
-      env <- use id >>= Env.pushEmpty
-      id .= env
+      env <- use environment >>= Env.pushEmpty
+      environment .= env
       traverse_ executePure stmts'
-      id %= Env.pop
+      environment %= Env.pop
       pure ()
     executePure (StmtWhile _ cond body) = whileM_ (isTruthy <$> interpret cond) (executePure body)
     executePure (StmtFunction _ name params body) = do
-      env <- use id
+      env <- use environment
       let f = LoxFun (map (view (lexeme . _Lexeme)) params) env body
           name' = view (lexeme . _Lexeme) name
       Env.define env name' f
@@ -81,7 +99,16 @@ evalPure = traverse_ executePure
 runEffect :: LoxEffect -> IO ()
 runEffect (LoxEffectPrint t) = TIO.putStrLn t
 
-interpret :: (MonadIO m, MonadState Environment m, MonadError InterpretError m, MonadWriter [LoxEffect] m) => Expr -> m LoxValue
+interpret ::
+  ( MonadIO m,
+    HasDepthMap s DepthMap,
+    HasEnvironment s Environment,
+    MonadState s m,
+    MonadError InterpretError m,
+    MonadWriter [LoxEffect] m
+  ) =>
+  Expr ->
+  m LoxValue
 --
 interpret (ExprLiteral _ LitNothing) = pure LoxNil
 interpret (ExprLiteral _ (LitText v)) = pure $ LoxText v
@@ -126,20 +153,17 @@ interpret (ExprBinary _ lhs op rhs) = do
     applyBinaryNumber f e1 e2 msg = liftEither $ maybeToRight (InterpretRuntimeError op msg) $ fmap LoxNumber (f <$> e1 ^? _LoxNumber <*> e2 ^? _LoxNumber)
     applyBinaryBool f e1 e2 msg = liftEither $ maybeToRight (InterpretRuntimeError op msg) $ fmap LoxBool (f <$> e1 ^? _LoxNumber <*> e2 ^? _LoxNumber)
 --
-interpret (ExprAssign _ name value) = do
+interpret (ExprAssign eid name value) = do
   let name' = name ^. lexeme . _Lexeme
   v <- interpret value
-  env <- use id
-  Env.assign env name name' v
+  mDistance <- use (depthMap . _DepthMap . at eid)
+  env <- use environment
+  case mDistance of
+    Just distance -> assignAt distance env name name' v
+    Nothing -> assignGlobal env name name' v
   pure v
 --
-interpret (ExprVariable _ name) = do
-  let name' = name ^. lexeme . _Lexeme
-  env <- use id
-  mv <- Env.lookup env name'
-  case mv of
-    Just v -> pure v
-    Nothing -> throwError $ InterpretRuntimeError name [i|Undefined variable '#{name'}'|]
+interpret (ExprVariable eid name) = lookupVariable name eid
 --
 interpret (ExprLogical _ lhs op rhs) = do
   left <- interpret lhs
@@ -154,17 +178,37 @@ interpret (ExprCall _ callee paren arguments) = do
   let function = callee'
   call paren function args
 
-call :: (MonadIO m, MonadError InterpretError m, MonadState Environment m, MonadWriter [LoxEffect] m) => Token -> LoxValue -> [LoxValue] -> m LoxValue
+-- lookupVariable :: (MonadState s m, HasDepthMap s DepthMap,) => Token -> Expr -> m LoxValue
+lookupVariable ::
+  ( MonadIO m,
+    HasDepthMap s DepthMap,
+    HasEnvironment s Environment,
+    MonadState s m
+  ) =>
+  Token ->
+  UUID ->
+  m LoxValue
+lookupVariable name eid = do
+  mDistance <- use (depthMap . _DepthMap . at eid)
+  case mDistance of
+    Just distance -> do
+      env <- use environment
+      Env.unsafeLookupAt distance env (view (lexeme . _Lexeme) name)
+    Nothing -> do
+      env <- use environment
+      Env.unsafeGlobalGet env (view (lexeme . _Lexeme) name)
+
+call :: (MonadIO m, MonadError InterpretError m, HasDepthMap s DepthMap, HasEnvironment s Environment, MonadState s m, MonadWriter [LoxEffect] m) => Token -> LoxValue -> [LoxValue] -> m LoxValue
 call _ (LoxFun params funEnv body) args = do
   callEnv <- Env.pushEmpty funEnv
   for_ (params `zip` args) $ uncurry (Env.define callEnv)
-  oldEnv <- id <<.= callEnv
+  oldEnv <- environment <<.= callEnv
   r <- tryError $ evalPure body
   r' <- case r of
     Left (InterpretReturn v) -> pure $ Just v
     Left e@(InterpretRuntimeError _ _) -> throwError e
     Right _ -> pure Nothing
-  id .= oldEnv
+  environment .= oldEnv
   pure (fromMaybe LoxNil r')
 call _ (LoxNativeFun LoxClock) _ = LoxNumber . realToFrac <$> liftIO getPOSIXTime
 call paren _ _ = throwError (InterpretRuntimeError paren "Can only call functions and classes.")
