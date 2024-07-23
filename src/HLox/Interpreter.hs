@@ -1,13 +1,9 @@
 module HLox.Interpreter (interpret, eval, evalPure) where
 
 import Control.Applicative ((<|>))
-import Control.Lens (at)
 import Control.Lens.Combinators (to, use, view)
 import Control.Lens.Operators
   ( (%=),
-    (&),
-    (?=),
-    (?~),
     (^.),
     (^?), (<<.=), (.=),
   )
@@ -22,7 +18,6 @@ import Control.Monad.Writer (runWriterT)
 import Control.Monad.Writer.Class (tell)
 import Data.Either.Combinators (maybeToRight)
 import Data.Foldable (for_, traverse_)
-import Data.List (foldl')
 import Data.Maybe (fromMaybe)
 import Data.String.Interpolate (i)
 import Data.Text qualified as Text
@@ -34,9 +29,9 @@ import HLox.Scanner.Types
 import HLox.Types (Lox)
 import HLox.Util (loxRuntimeError)
 
-eval :: (Traversable t) => t Stmt -> Lox ()
-eval stmts = do
-  r <- runExceptT $ runWriterT $ flip evalStateT initialEnv $ evalPure stmts
+eval :: (Traversable t) => Environment -> t Stmt -> Lox ()
+eval env stmts = do
+  r <- runExceptT $ runWriterT $ flip evalStateT env $ evalPure stmts
   case r of
     Left err -> loxRuntimeError err
     Right (_, effs) -> do liftIO $ for_ effs runEffect
@@ -54,25 +49,26 @@ evalPure = traverse_ executePure
       x <- interpret e
       tell [LoxEffectPrint $ stringify x]
     executePure (StmtVar name Nothing) = do
-      at (name ^. lexeme . _Lexeme) ?= LoxNil
-      pure ()
+      let name' = name ^. lexeme . _Lexeme
+      env <- use id
+      envDefine env name' LoxNil
     executePure (StmtVar name (Just initializer)) = do
       v <- interpret initializer
       let name' = name ^. lexeme . _Lexeme
-      at name' ?= v
-      pure ()
+      env <- use id
+      envDefine env name' v
     executePure (StmtBlock stmts') = do
-      id %= pushEmptyEnv
+      env <- use id >>= pushEmptyEnv
+      id .= env
       traverse_ executePure stmts'
       id %= popEnv
       pure ()
     executePure (StmtWhile cond body) = whileM_ (isTruthy <$> interpret cond) (executePure body)
     executePure (StmtFunction name params body) = do
       env <- use id
-      let f = LoxFun (map (view (lexeme . _Lexeme)) params) env' body
-          env' = env & at name' ?~ f
+      let f = LoxFun (map (view (lexeme . _Lexeme)) params) env body
           name' = view (lexeme . _Lexeme) name
-      id .= env'
+      envDefine env name' f
     executePure (StmtReturn _ value) = do
       r <- case value of
         Just v -> interpret v
@@ -130,15 +126,14 @@ interpret (ExprBinary lhs op rhs) = do
 interpret (ExprAssign name value) = do
   let name' = name ^. lexeme . _Lexeme
   v <- interpret value
-  r <- use (at name')
-  case r of
-    Nothing -> throwError (InterpretRuntimeError name [i|Undefined variable '#{name'}'|])
-    Just _ -> at name' ?= v
+  env <- use id
+  envAssign env name name' v
   pure v
 --
 interpret (ExprVariable name) = do
   let name' = name ^. lexeme . _Lexeme
-  mv <- use $ at name'
+  env <- use id
+  mv <- envLookup env name'
   case mv of
     Just v -> pure v
     Nothing -> throwError $ InterpretRuntimeError name [i|Undefined variable '#{name'}'|]
@@ -158,8 +153,9 @@ interpret (ExprCall callee paren arguments) = do
 
 call :: (MonadIO m, MonadError InterpretError m, MonadState Environment m, MonadWriter [LoxEffect] m) => Token -> LoxValue -> [LoxValue] -> m LoxValue
 call _ (LoxFun params funEnv body) args = do
-  let funEnvWithParams = foldl' (\acc (k, v) -> acc & at k ?~ v) funEnv (params `zip` args)
-  oldEnv <- id <<.= funEnvWithParams
+  callEnv <- pushEmptyEnv funEnv
+  for_ (params `zip` args) $ uncurry (envDefine callEnv)
+  oldEnv <- id <<.= callEnv
   r <- tryError $ evalPure body
   r' <- case r of
     Left (InterpretReturn v) -> pure $ Just v

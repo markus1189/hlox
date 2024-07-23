@@ -69,11 +69,14 @@ run script = do
           parseResult <- parse tokens
           case parseResult of
             Left _ -> pure ()
-            Right stmts -> eval stmts
+            Right stmts -> do
+              env <- initialEnv
+              eval env stmts
         else do
           parseResult <- parseExpr tokens
           for_ parseResult $ \stmts -> do
-            result <- fmap (fmap fst) $ runExceptT $ runWriterT $ flip evalStateT initialEnv (interpret stmts)
+            env <- initialEnv
+            result <- fmap (fmap fst) $ runExceptT $ runWriterT $ flip evalStateT env (interpret stmts)
             traverse_ (liftIO . TIO.putStrLn . pretty) result
     scanErrs -> do
       liftIO $ TIO.putStrLn "There were scan errors:"

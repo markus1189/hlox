@@ -20,6 +20,7 @@ common deps
                    , extra
                    , filepath
                    , formatting
+                   , hashtables
                    , lens ^>=5.3.0
                    , monad-loops
                    , mtl

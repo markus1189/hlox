@@ -1,21 +1,25 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 module HLox.Interpreter.Types where
 
-import Control.Lens (At, Index, IxValue, Lens', Traversal', ix, _head)
-import Control.Lens.Combinators (Ixed, at, lens, view)
-import Control.Lens.Operators ((%~), (&), (.~), (?~))
 import Control.Lens.TH (makePrisms)
-import Control.Monad (join)
-import Data.Foldable (find)
-import Data.List (findIndex)
-import Data.Map.Strict (Map)
-import Data.Map.Strict qualified as Map
-import Data.Maybe (isJust)
 import Data.String.Interpolate (i)
 import Data.Text (Text)
 import Formatting (sformat, shortest)
 import HLox.Parser.Types (Stmt)
 import HLox.Pretty (Pretty, pretty)
-import HLox.Scanner.Types
+import HLox.Scanner.Types ( Token )
+
+import qualified Data.HashTable.IO as H
+import Control.Monad.IO.Class (MonadIO(liftIO))
+import Control.Monad.Extra (ifM)
+import Data.Maybe (isJust)
+import Data.List.NonEmpty (NonEmpty ((:|)), (<|))
+import qualified Data.List.NonEmpty as NonEmpty
+import Control.Applicative ((<|>))
+import Control.Monad.Error.Class (MonadError (throwError))
+import Control.Monad (void)
+
+type HashTable k v = H.CuckooHashTable k v
 
 data LoxNativeFunKind = LoxClock deriving (Show, Eq, Ord)
 
@@ -48,43 +52,43 @@ data InterpretError
   | InterpretReturn !LoxValue
   deriving (Show, Eq)
 
-newtype Environment = Environment [Map Text LoxValue] deriving (Show, Eq, Ord)
+newtype Environment = Environment (NonEmpty (HashTable Text LoxValue)) deriving (Show)
+
+instance Eq Environment where
+  (==) _ _ = False
+
+instance Ord Environment where
+  compare _ _ = EQ
 
 makePrisms ''LoxValue
 makePrisms ''Environment
 
-initialEnv :: Environment
-initialEnv = Environment [Map.fromList [("clock", LoxNativeFun LoxClock)]]
+initialEnv :: MonadIO m => m Environment
+initialEnv = Environment . pure <$> liftIO (H.fromList [("clock", LoxNativeFun LoxClock)])
 
-pushEnv :: Environment -> Environment -> Environment
-pushEnv (Environment es1) (Environment es2) = Environment (es1 ++ es2)
-
-pushEmptyEnv :: Environment -> Environment
-pushEmptyEnv (Environment es) = Environment (mempty : es)
+pushEmptyEnv :: MonadIO m => Environment -> m Environment
+pushEmptyEnv (Environment es) = Environment . (<| es) <$> liftIO H.new
 
 popEnv :: Environment -> Environment
-popEnv e@(Environment []) = e
-popEnv (Environment (_ : es)) = Environment es
+popEnv (Environment (e:|[])) = Environment (e:|[])
+popEnv (Environment (_:|(e:es))) = Environment (e :| es)
 
-type instance IxValue Environment = LoxValue
+envDefine :: MonadIO m => Environment -> Text -> LoxValue -> m ()
+envDefine (Environment (e :| _)) k v = liftIO $ H.insert e k v
 
-type instance Index Environment = Text
+envLookup :: MonadIO m => Environment -> Text -> m (Maybe LoxValue)
+envLookup (Environment es) k = liftIO . go . NonEmpty.toList $ es
+  where
+    go [] = pure Nothing
+    go (e:es') = (<|>) <$> H.lookup e k <*> go es'
 
-instance Ixed Environment where
-  ix :: Index Environment -> Traversal' Environment (IxValue Environment)
-  ix name = _Environment . traverse . ix name
+envAssign :: (MonadError InterpretError m, MonadIO m) => Environment -> Token -> Text -> LoxValue -> m ()
+envAssign (Environment es) t k v = go . NonEmpty.toList $ es
+  where
+    go [] = throwError $ InterpretRuntimeError t [i|Undefined variable '#{k}'|]
+    go (e:es') = ifM (isJust <$> liftIO (H.lookup e k))
+      (liftIO $ void (liftIO (H.insert e k v)))
+      (go es')
 
-instance At Environment where
-  at :: Text -> Lens' Environment (Maybe LoxValue)
-  at name = lens get set
-    where
-      get :: Environment -> Maybe LoxValue
-      get (Environment es) = join $ find isJust $ map (view (at name)) es
-
-      set :: Environment -> Maybe LoxValue -> Environment
-      set (Environment es) (Just v) = case findIndex (Map.member name) es of
-        Nothing -> Environment $ es & _head %~ (at name ?~ v)
-        Just x -> Environment $ es & ix x %~ at name ?~ v
-      set env@(Environment es) Nothing = case findIndex (Map.member name) es of
-        Nothing -> env
-        Just x -> Environment $ es & ix x %~ at name .~ Nothing
+envSize :: Environment -> Int
+envSize (Environment es) = NonEmpty.length es
