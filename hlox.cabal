@@ -51,6 +51,7 @@ library
     import:           deps
     exposed-modules:  HLox
                     , HLox.Interpreter
+                    , HLox.Interpreter.Environment
                     , HLox.Interpreter.Types
                     , HLox.Parser
                     , HLox.Parser.Types

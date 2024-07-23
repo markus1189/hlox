@@ -12,7 +12,6 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TIO
 import HLox.Interpreter (eval, interpret)
-import HLox.Interpreter.Types (initialEnv)
 import HLox.Parser (parse, parseExpr, pretty)
 import HLox.Scanner (TokenType (SEMICOLON), scanTokens)
 import HLox.Scanner.Types (ScanError (..), tokenType)
@@ -21,6 +20,7 @@ import HLox.Util
 import Streaming.Prelude qualified as S
 import System.Environment (getArgs)
 import System.Exit (ExitCode (ExitFailure), exitWith)
+import qualified HLox.Interpreter.Environment as Env
 
 main :: IO ()
 main = do
@@ -70,12 +70,12 @@ run script = do
           case parseResult of
             Left _ -> pure ()
             Right stmts -> do
-              env <- initialEnv
+              env <- Env.global
               eval env stmts
         else do
           parseResult <- parseExpr tokens
           for_ parseResult $ \stmts -> do
-            env <- initialEnv
+            env <- Env.global
             result <- fmap (fmap fst) $ runExceptT $ runWriterT $ flip evalStateT env (interpret stmts)
             traverse_ (liftIO . TIO.putStrLn . pretty) result
     scanErrs -> do
