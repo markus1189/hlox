@@ -9,7 +9,7 @@ import Control.Lens.Operators
     (?=),
     (?~),
     (^.),
-    (^?),
+    (^?), (<<.=), (.=),
   )
 import Control.Monad (unless, void)
 import Control.Monad.Error.Class (liftEither, tryError)
@@ -69,10 +69,10 @@ evalPure = traverse_ executePure
     executePure (StmtWhile cond body) = whileM_ (isTruthy <$> interpret cond) (executePure body)
     executePure (StmtFunction name params body) = do
       env <- use id
-      let f = LoxFun (map (view (lexeme . _Lexeme)) params) env body
+      let f = LoxFun (map (view (lexeme . _Lexeme)) params) env' body
+          env' = env & at name' ?~ f
           name' = view (lexeme . _Lexeme) name
-      at name' ?= f
-      pure ()
+      id .= env'
     executePure (StmtReturn _ value) = do
       r <- case value of
         Just v -> interpret v
@@ -159,13 +159,13 @@ interpret (ExprCall callee paren arguments) = do
 call :: (MonadIO m, MonadError InterpretError m, MonadState Environment m, MonadWriter [LoxEffect] m) => Token -> LoxValue -> [LoxValue] -> m LoxValue
 call _ (LoxFun params funEnv body) args = do
   let funEnvWithParams = foldl' (\acc (k, v) -> acc & at k ?~ v) funEnv (params `zip` args)
-  id %= pushEnv funEnvWithParams
+  oldEnv <- id <<.= funEnvWithParams
   r <- tryError $ evalPure body
   r' <- case r of
     Left (InterpretReturn v) -> pure $ Just v
     Left e@(InterpretRuntimeError _ _) -> throwError e
     Right _ -> pure Nothing
-  id %= popEnv
+  id .= oldEnv
   pure (fromMaybe LoxNil r')
 call _ (LoxNativeFun LoxClock) _ = LoxNumber . realToFrac <$> liftIO getPOSIXTime
 call paren _ _ = throwError (InterpretRuntimeError paren "Can only call functions and classes.")

@@ -51,7 +51,6 @@ data InterpretError
 newtype Environment = Environment [Map Text LoxValue] deriving (Show, Eq, Ord)
 
 makePrisms ''LoxValue
-
 makePrisms ''Environment
 
 initialEnv :: Environment
