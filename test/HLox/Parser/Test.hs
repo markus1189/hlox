@@ -13,6 +13,7 @@ import System.FilePath ((</>))
 import Test.Hspec (SpecWith, describe, expectationFailure, it, shouldBe)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Golden (goldenVsString)
+import Data.UUID qualified as UUID
 
 testValidParserExpr :: String -> Text -> TestTree
 testValidParserExpr name input = goldenVsString name ("golden" </> "parser" </> name) $ do
@@ -38,9 +39,10 @@ spec_simpleAst = do
     it "should print a simple ast" $ do
       let e =
             ExprBinary
-              (ExprUnary (Token MINUS (Lexeme "-") LitNothing (Line 1)) (ExprLiteral (LitNumber 123)))
+              UUID.nil
+              (ExprUnary UUID.nil (Token MINUS (Lexeme "-") LitNothing (Line 1)) (ExprLiteral UUID.nil (LitNumber 123)))
               (Token STAR (Lexeme "*") LitNothing (Line 1))
-              (ExprGrouping (ExprLiteral (LitNumber 45.67)))
+              (ExprGrouping UUID.nil (ExprLiteral UUID.nil (LitNumber 45.67)))
           result = pretty e
       result `shouldBe` "(* (- 123) (group 45.67))"
 
@@ -54,7 +56,7 @@ spec_simpleAst = do
               [ Token NUMBER (Lexeme "42") (LitNumber 42) (Line 1),
                 Token EOF (Lexeme "") LitNothing (Line 1)
               ]
-        result `shouldBe` Right (ExprLiteral (LitNumber 42))
+        result `shouldBe` Right (ExprLiteral UUID.nil (LitNumber 42))
 
       it "should parse an expression" $ do
         result <- parseExpr' "1 * 2 + 3 == 6"

@@ -21,8 +21,9 @@ import Data.Vector qualified as Vector
 import HLox.Parser.Types
 import HLox.Pretty (Pretty, pretty)
 import HLox.Scanner.Types
-import HLox.Types (Lox)
+import HLox.Types (Lox, freshId, MonadFreshId)
 import HLox.Util (loxReport)
+import Data.UUID (UUID)
 
 data ParseState = ParseState
   { _psCurrent :: !Int,
@@ -69,14 +70,14 @@ parseFunction kind = do
     void $ lift $ createError t "Can't have more than 255 arguments."
   void $ consume RIGHT_PAREN "Expect ')' after parameters."
   void $ consume LEFT_BRACE [i|Expect '{' before #{kind} body.|]
-  StmtFunction name parameters <$> parseBlock
+  StmtFunction <$> freshId <*> pure name <*> pure parameters <*> parseBlock
 
 parseVarDeclaration :: StateT ParseState Lox Stmt
 parseVarDeclaration = do
   name <- consume IDENTIFIER "Expect variable name."
   initializer <- ifM (match [EQUAL]) (Just <$> parseExpression) (pure Nothing)
   void $ consume SEMICOLON "Expect ';' after variable declaration."
-  pure $ StmtVar name initializer
+  StmtVar <$> freshId <*> pure name <*> pure initializer
 
 parseStatement :: StateT ParseState Lox Stmt
 parseStatement = do
@@ -85,7 +86,7 @@ parseStatement = do
       ifM (match [PRINT]) parsePrintStatement $
         ifM (match [RETURN]) parseReturnStatement $
           ifM (match [WHILE]) parseWhileStatement $
-            ifM (match [LEFT_BRACE]) (StmtBlock <$> parseBlock) parseExpressionStatement
+            ifM (match [LEFT_BRACE]) (StmtBlock <$> freshId <*> parseBlock) parseExpressionStatement
 
 parseForStatement :: StateT ParseState Lox Stmt
 parseForStatement = do
@@ -99,11 +100,18 @@ parseForStatement = do
   increment <- ifM (not <$> check RIGHT_PAREN) (Just <$> parseExpression) (pure Nothing)
   void $ consume RIGHT_PAREN "Expect ')' after for clauses."
   body <- parseStatement
-  let body' = maybe body (\increment' -> StmtBlock [body, StmtExpr increment']) increment
-      condition' = fromMaybe (ExprLiteral (LitBool True)) condition
-      body'' = StmtWhile condition' body'
-      body''' = maybe body'' (\initializer' -> StmtBlock [initializer', body'']) initializer
-  pure body'''
+  body' <- case increment of
+    Nothing -> pure body
+    Just increment' -> do
+      xs <- StmtExpr <$> freshId <*> pure increment'
+      StmtBlock <$> freshId <*> pure [body, xs]
+  condition' <- case condition of
+    Nothing -> ExprLiteral <$> freshId <*> pure (LitBool True)
+    Just c -> pure c
+  body'' <- StmtWhile <$> freshId <*> pure condition' <*> pure body'
+  case initializer of
+    Nothing -> pure body''
+    Just initializer' -> StmtBlock <$> freshId <*> pure [initializer', body'']
 
 parseIfStatement :: StateT ParseState Lox Stmt
 parseIfStatement = do
@@ -114,26 +122,26 @@ parseIfStatement = do
   thenBranch <- parseStatement
   elseBranch <- ifM (match [ELSE]) (Just <$> parseStatement) (pure Nothing)
 
-  pure $ StmtIf condition thenBranch elseBranch
+  StmtIf <$> freshId <*> pure condition <*> pure thenBranch <*> pure elseBranch
 
 parsePrintStatement :: StateT ParseState Lox Stmt
 parsePrintStatement = do
   e <- parseExpression
   void $ consume SEMICOLON "Expect ';' after value."
-  pure $ StmtPrint e
+  StmtPrint <$> freshId <*> pure e
 
 parseReturnStatement :: StateT ParseState Lox Stmt
 parseReturnStatement = do
   keyword <- previous
   value <- ifM (check SEMICOLON) (pure Nothing) (Just <$> parseExpression)
   void $ consume SEMICOLON "Expect ';' after return value."
-  pure $ StmtReturn keyword value
+  StmtReturn <$> freshId <*> pure keyword <*> pure value
 
 parseWhileStatement :: StateT ParseState Lox Stmt
 parseWhileStatement = do
   condition <- consume LEFT_PAREN "Expect '(' after 'while'." *> parseExpression
   body <- consume RIGHT_PAREN "Expect ')' after 'while condition'." *> parseStatement
-  pure $ StmtWhile condition body
+  StmtWhile <$> freshId <*> pure condition <*> pure body
 
 parseBlock :: StateT ParseState Lox [Stmt]
 parseBlock = do
@@ -145,7 +153,7 @@ parseExpressionStatement :: StateT ParseState Lox Stmt
 parseExpressionStatement = do
   e <- parseExpression
   void $ consume SEMICOLON "Expect ';' after expression."
-  pure $ StmtExpr e
+  StmtExpr <$> freshId <*> pure e
 
 parseExpression :: StateT ParseState Lox Expr
 parseExpression = parseAssignment
@@ -161,7 +169,7 @@ parseAssignment = do
         value <- parseAssignment
 
         case expr of
-          ExprVariable name -> pure $ ExprAssign name value
+          ExprVariable _ name -> lift $ ExprAssign <$> freshId <*> pure name <*> pure value
           _ -> do
             lift $ void $ createError equals "Invalid assignment target."
             pure expr
@@ -192,7 +200,7 @@ parseUnary =
     (match [BANG, MINUS])
     ( do
         op <- previous
-        ExprUnary op <$> parseUnary
+        ExprUnary <$> freshId <*> pure op <*> parseUnary
     )
     parseCall
 
@@ -210,34 +218,34 @@ finishCall callee = do
   when (length arguments >= 255) $ do
     t <- peek
     void $ lift $ createError t "Can't have more than 255 arguments."
-  pure $ ExprCall callee paren arguments
+  ExprCall <$> freshId <*> pure callee <*> pure paren <*> pure arguments
 
 parsePrimary :: StateT ParseState Lox Expr
-parsePrimary = ifM (match [FALSE]) (pure $ ExprLiteral (LitBool False))
-  $ ifM (match [TRUE]) (pure $ ExprLiteral (LitBool True))
-  $ ifM (match [NIL]) (pure $ ExprLiteral LitNothing)
+parsePrimary = ifM (match [FALSE]) (ExprLiteral <$> freshId <*> pure (LitBool False))
+  $ ifM (match [TRUE]) (ExprLiteral <$> freshId <*> pure (LitBool True))
+  $ ifM (match [NIL]) (ExprLiteral <$> freshId <*> pure LitNothing)
   $ ifM
     (match [NUMBER, STRING])
     ( do
         n <- previous
-        pure $ ExprLiteral (n ^. literal)
+        ExprLiteral <$> freshId <*> pure (n ^. literal)
     )
   $ ifM
     (match [IDENTIFIER])
-    (ExprVariable <$> previous)
+    (ExprVariable <$> freshId <*> previous)
   $ ifM
     (match [LEFT_PAREN])
     ( do
         e <- parseExpression
         void $ consume RIGHT_PAREN "Expect ')' after expression."
-        pure $ ExprGrouping e
+        ExprGrouping <$> freshId <*> pure e
     )
   $ do
     t <- peek
     err <- lift $ createError t "Expect expression."
     liftIO . throwIO $ err
 
-parseBinary :: (MonadState ParseState m) => (a -> Token -> a -> a) -> m a -> [TokenType] -> m a
+parseBinary :: (MonadFreshId m, MonadState ParseState m) => (UUID -> a  -> Token -> a -> a) -> m a -> [TokenType] -> m a
 parseBinary ctor p ts = do
   expr <- p
   fromMaybe expr . preview _last <$> unfoldrM unfoldStep expr
@@ -248,7 +256,7 @@ parseBinary ctor p ts = do
         then do
           operator <- previous
           right <- p
-          let r = ctor e operator right
+          r <- ctor <$> freshId <*> pure e <*> pure operator <*> pure right
           pure $ Just (r, r)
         else pure Nothing
 

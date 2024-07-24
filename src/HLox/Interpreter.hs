@@ -42,37 +42,37 @@ eval env stmts = do
 evalPure :: (Traversable t, MonadIO m, MonadState Environment m, MonadError InterpretError m, MonadWriter [LoxEffect] m) => t Stmt -> m ()
 evalPure = traverse_ executePure
   where
-    executePure (StmtIf c t f) = do
+    executePure (StmtIf _ c t f) = do
       c' <- interpret c
       if isTruthy c'
         then executePure t
         else traverse_ executePure f
-    executePure (StmtExpr e) = void $ interpret e
-    executePure (StmtPrint e) = do
+    executePure (StmtExpr _ e) = void $ interpret e
+    executePure (StmtPrint _ e) = do
       x <- interpret e
       tell [LoxEffectPrint $ stringify x]
-    executePure (StmtVar name Nothing) = do
+    executePure (StmtVar _ name Nothing) = do
       let name' = name ^. lexeme . _Lexeme
       env <- use id
       Env.define env name' LoxNil
-    executePure (StmtVar name (Just initializer)) = do
+    executePure (StmtVar _ name (Just initializer)) = do
       v <- interpret initializer
       let name' = name ^. lexeme . _Lexeme
       env <- use id
       Env.define env name' v
-    executePure (StmtBlock stmts') = do
+    executePure (StmtBlock _ stmts') = do
       env <- use id >>= Env.pushEmpty
       id .= env
       traverse_ executePure stmts'
       id %= Env.pop
       pure ()
-    executePure (StmtWhile cond body) = whileM_ (isTruthy <$> interpret cond) (executePure body)
-    executePure (StmtFunction name params body) = do
+    executePure (StmtWhile _ cond body) = whileM_ (isTruthy <$> interpret cond) (executePure body)
+    executePure (StmtFunction _ name params body) = do
       env <- use id
       let f = LoxFun (map (view (lexeme . _Lexeme)) params) env body
           name' = view (lexeme . _Lexeme) name
       Env.define env name' f
-    executePure (StmtReturn _ value) = do
+    executePure (StmtReturn _ _ value) = do
       r <- case value of
         Just v -> interpret v
         Nothing -> pure LoxNil
@@ -83,14 +83,14 @@ runEffect (LoxEffectPrint t) = TIO.putStrLn t
 
 interpret :: (MonadIO m, MonadState Environment m, MonadError InterpretError m, MonadWriter [LoxEffect] m) => Expr -> m LoxValue
 --
-interpret (ExprLiteral LitNothing) = pure LoxNil
-interpret (ExprLiteral (LitText v)) = pure $ LoxText v
-interpret (ExprLiteral (LitNumber v)) = pure $ LoxNumber v
-interpret (ExprLiteral (LitBool v)) = pure $ LoxBool v
+interpret (ExprLiteral _ LitNothing) = pure LoxNil
+interpret (ExprLiteral _ (LitText v)) = pure $ LoxText v
+interpret (ExprLiteral _ (LitNumber v)) = pure $ LoxNumber v
+interpret (ExprLiteral _ (LitBool v)) = pure $ LoxBool v
 --
-interpret (ExprGrouping e) = interpret e
+interpret (ExprGrouping _ e) = interpret e
 --
-interpret (ExprUnary t e) = case t ^. tokenType of
+interpret (ExprUnary _ t e) = case t ^. tokenType of
   BANG -> LoxBool . not . isTruthy <$> interpret e
   MINUS -> do
     right <- interpret e
@@ -99,7 +99,7 @@ interpret (ExprUnary t e) = case t ^. tokenType of
       _ -> throwError $ InterpretRuntimeError t "Unary minus on invalid value"
   _ -> throwError $ InterpretRuntimeError t "Unmatched case"
 --
-interpret (ExprBinary lhs op rhs) = do
+interpret (ExprBinary _ lhs op rhs) = do
   e1 <- interpret lhs
   e2 <- interpret rhs
   case opType of
@@ -126,14 +126,14 @@ interpret (ExprBinary lhs op rhs) = do
     applyBinaryNumber f e1 e2 msg = liftEither $ maybeToRight (InterpretRuntimeError op msg) $ fmap LoxNumber (f <$> e1 ^? _LoxNumber <*> e2 ^? _LoxNumber)
     applyBinaryBool f e1 e2 msg = liftEither $ maybeToRight (InterpretRuntimeError op msg) $ fmap LoxBool (f <$> e1 ^? _LoxNumber <*> e2 ^? _LoxNumber)
 --
-interpret (ExprAssign name value) = do
+interpret (ExprAssign _ name value) = do
   let name' = name ^. lexeme . _Lexeme
   v <- interpret value
   env <- use id
   Env.assign env name name' v
   pure v
 --
-interpret (ExprVariable name) = do
+interpret (ExprVariable _ name) = do
   let name' = name ^. lexeme . _Lexeme
   env <- use id
   mv <- Env.lookup env name'
@@ -141,13 +141,13 @@ interpret (ExprVariable name) = do
     Just v -> pure v
     Nothing -> throwError $ InterpretRuntimeError name [i|Undefined variable '#{name'}'|]
 --
-interpret (ExprLogical lhs op rhs) = do
+interpret (ExprLogical _ lhs op rhs) = do
   left <- interpret lhs
   if op ^. tokenType == OR && isTruthy left || op ^. tokenType == AND && not (isTruthy left)
     then pure left
     else interpret rhs
 --
-interpret (ExprCall callee paren arguments) = do
+interpret (ExprCall _ callee paren arguments) = do
   callee' <- interpret callee
   args <- traverse interpret arguments
   checkArity paren (length args) callee'
