@@ -9,6 +9,7 @@ import Formatting.Formatters (shortest)
 import HLox.Pretty (Pretty, pretty)
 import HLox.Scanner.Types
 import Data.UUID (UUID)
+import Control.Lens.Type (Lens')
 
 data Expr
   = ExprAssign !UUID !Token !Expr
@@ -20,6 +21,16 @@ data Expr
   | ExprUnary !UUID !Token !Expr
   | ExprVariable !UUID !Token
   deriving (Show, Eq, Ord)
+
+exprId :: Lens' Expr UUID
+exprId f (ExprAssign uid name value) = fmap (\uid' -> ExprAssign uid' name value) (f uid)
+exprId f (ExprBinary uid lhs op rhs) = fmap (\uid' -> ExprBinary uid' lhs op rhs) (f uid)
+exprId f (ExprLogical uid lhs op rhs) = fmap (\uid' -> ExprLogical uid' lhs op rhs) (f uid)
+exprId f (ExprCall uid callee paren arguments) = fmap (\uid' -> ExprCall uid' callee paren arguments) (f uid)
+exprId f (ExprGrouping uid e) = fmap (`ExprGrouping` e) (f uid)
+exprId f (ExprLiteral uid lit) = fmap (`ExprLiteral` lit) (f uid)
+exprId f (ExprUnary uid op e) = fmap (\uid' -> ExprUnary uid' op e) (f uid)
+exprId f (ExprVariable uid t) = fmap (`ExprVariable` t) (f uid)
 
 instance Pretty Expr where
   pretty :: Expr -> Text

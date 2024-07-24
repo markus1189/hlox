@@ -14,6 +14,7 @@ import Test.Hspec (SpecWith, describe, expectationFailure, it, shouldBe)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Golden (goldenVsString)
 import Data.UUID qualified as UUID
+import Control.Lens.Operators ((<&>), (.~))
 
 testValidParserExpr :: String -> Text -> TestTree
 testValidParserExpr name input = goldenVsString name ("golden" </> "parser" </> name) $ do
@@ -56,7 +57,7 @@ spec_simpleAst = do
               [ Token NUMBER (Lexeme "42") (LitNumber 42) (Line 1),
                 Token EOF (Lexeme "") LitNothing (Line 1)
               ]
-        result `shouldBe` Right (ExprLiteral UUID.nil (LitNumber 42))
+        (result <&> exprId .~ UUID.nil) `shouldBe` Right (ExprLiteral UUID.nil (LitNumber 42))
 
       it "should parse an expression" $ do
         result <- parseExpr' "1 * 2 + 3 == 6"
