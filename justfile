@@ -1,4 +1,4 @@
-build: format
+build: format lint
     #!/usr/bin/env bash
     cabal build --enable-tests
 
@@ -38,6 +38,10 @@ accept: format
 format:
     #!/usr/bin/env bash
     ormolu --mode inplace $(git ls-files '*.hs')
+
+lint:
+    #!/usr/bin/env bash
+    hlint .
 
 check-format:
     #!/usr/bin/env bash
