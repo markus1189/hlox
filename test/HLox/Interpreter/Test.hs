@@ -1,22 +1,23 @@
 {-# OPTIONS_GHC -Wno-deferred-out-of-scope-variables #-}
+
 module HLox.Interpreter.Test where
 
-import           Control.Lens.Lens ((<&>))
-import           Control.Monad.Except (runExceptT)
-import           Control.Monad.State (evalStateT)
-import           Control.Monad.Writer (execWriterT)
-import           Data.String.Interpolate (i)
-import           Data.Text (Text)
-import           HLox.Interpreter (evalPure, evalExpr)
-import qualified HLox.Interpreter.Environment as Env
-import           HLox.Interpreter.Types
-import           HLox.Parser (parse, parseExpr)
-import           HLox.Scanner (scanTokens)
-import           HLox.Scanner.Types
-import           HLox.Types
-import           Test.Hspec (SpecWith, describe, it, shouldBe)
-import HLox.Resolver.Types (DepthMap(..))
+import Control.Lens.Lens ((<&>))
+import Control.Monad.Except (runExceptT)
+import Control.Monad.State (evalStateT)
+import Control.Monad.Writer (execWriterT)
+import Data.String.Interpolate (i)
+import Data.Text (Text)
+import HLox.Interpreter (evalExpr, evalPure)
+import HLox.Interpreter.Environment qualified as Env
+import HLox.Interpreter.Types
+import HLox.Parser (parse, parseExpr)
 import HLox.Resolver (resolve)
+import HLox.Resolver.Types (DepthMap (..))
+import HLox.Scanner (scanTokens)
+import HLox.Scanner.Types
+import HLox.Types
+import Test.Hspec (SpecWith, describe, it, shouldBe)
 
 spec_environment :: SpecWith ()
 spec_environment = do
@@ -140,7 +141,6 @@ spec_interpreterStmt = do
               |]
         result <- interpretStmt' program
         result `shouldBe` Right [LoxEffectPrint "Hi, Dear Reader!"]
-
 
 spec_interpreterPrograms :: SpecWith ()
 spec_interpreterPrograms = do

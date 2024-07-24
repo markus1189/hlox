@@ -1,15 +1,15 @@
 module HLox.Parser.Types where
 
 import Control.Exception (Exception)
+import Control.Lens.Type (Lens')
 import Data.String.Interpolate (i)
 import Data.Text (Text)
 import Data.Text qualified as Text
+import Data.UUID (UUID)
 import Formatting (build, sformat)
 import Formatting.Formatters (shortest)
 import HLox.Pretty (Pretty, pretty)
 import HLox.Scanner.Types
-import Data.UUID (UUID)
-import Control.Lens.Type (Lens')
 
 data Expr
   = ExprAssign !UUID !Token !Expr

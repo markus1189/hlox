@@ -1,6 +1,6 @@
 module HLox.Interpreter.Types where
 
-import Control.Lens.TH (makePrisms, makeFields)
+import Control.Lens.TH (makeFields, makePrisms)
 import Data.HashTable.IO qualified as H
 import Data.List.NonEmpty (NonEmpty)
 import Data.String.Interpolate (i)
@@ -8,15 +8,14 @@ import Data.Text (Text)
 import Formatting (sformat, shortest)
 import HLox.Parser.Types (Stmt)
 import HLox.Pretty (Pretty, pretty)
-import HLox.Scanner.Types (Token)
 import HLox.Resolver.Types (DepthMap)
+import HLox.Scanner.Types (Token)
 
 type HashTable k v = H.CuckooHashTable k v
 
 data LoxNativeFunKind = LoxClock deriving (Show, Eq, Ord)
 
-data LoxEffect = LoxEffectPrint !Text
-  deriving (Show, Eq, Ord)
+newtype LoxEffect = LoxEffectPrint Text deriving (Show, Eq, Ord)
 
 data LoxValue
   = LoxNil
@@ -36,7 +35,7 @@ stringify (LoxNumber n) = sformat shortest n
 stringify (LoxText t) = t
 stringify (LoxBool True) = "true"
 stringify (LoxBool False) = "false"
-stringify (LoxFun _ _ _) = "<function>"
+stringify (LoxFun {}) = "<function>"
 stringify (LoxNativeFun k) = [i|<native function: #{show k}>|]
 
 data InterpretError

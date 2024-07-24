@@ -16,14 +16,14 @@ import Data.Either.Extra (fromEither)
 import Data.Maybe (catMaybes, fromMaybe, isJust)
 import Data.String.Interpolate (i)
 import Data.Text (Text)
+import Data.UUID (UUID)
 import Data.Vector (Vector, (!))
 import Data.Vector qualified as Vector
 import HLox.Parser.Types
 import HLox.Pretty (Pretty, pretty)
 import HLox.Scanner.Types
-import HLox.Types (Lox, freshId, MonadFreshId)
+import HLox.Types (Lox, MonadFreshId, freshId)
 import HLox.Util (loxReport)
-import Data.UUID (UUID)
 
 data ParseState = ParseState
   { _psCurrent :: !Int,
@@ -245,7 +245,7 @@ parsePrimary = ifM (match [FALSE]) (ExprLiteral <$> freshId <*> pure (LitBool Fa
     err <- lift $ createError t "Expect expression."
     liftIO . throwIO $ err
 
-parseBinary :: (MonadFreshId m, MonadState ParseState m) => (UUID -> a  -> Token -> a -> a) -> m a -> [TokenType] -> m a
+parseBinary :: (MonadFreshId m, MonadState ParseState m) => (UUID -> a -> Token -> a -> a) -> m a -> [TokenType] -> m a
 parseBinary ctor p ts = do
   expr <- p
   fromMaybe expr . preview _last <$> unfoldrM unfoldStep expr

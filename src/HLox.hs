@@ -10,17 +10,17 @@ import Data.Text qualified as Text
 import Data.Text.IO qualified as TIO
 import HLox.Interpreter (eval, evalExpr)
 import HLox.Interpreter.Environment qualified as Env
+import HLox.Interpreter.Types (InterpretError (..))
 import HLox.Parser (parse, parseExpr, pretty)
 import HLox.Resolver (resolve)
-import HLox.Resolver.Types (ResolverError (..), DepthMap (DepthMap))
+import HLox.Resolver.Types (DepthMap (DepthMap), ResolverError (..))
 import HLox.Scanner (TokenType (SEMICOLON), scanTokens)
-import HLox.Scanner.Types (ScanError (..), tokenType, line)
+import HLox.Scanner.Types (ScanError (..), line, tokenType)
 import HLox.Types (Lox, makeLoxEnv, runLox)
 import HLox.Util
 import Streaming.Prelude qualified as S
 import System.Environment (getArgs)
 import System.Exit (ExitCode (ExitFailure), exitWith)
-import HLox.Interpreter.Types (InterpretError(..))
 
 main :: IO ()
 main = do

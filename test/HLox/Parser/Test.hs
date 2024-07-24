@@ -1,9 +1,11 @@
 module HLox.Parser.Test where
 
 import Control.Exception (throwIO)
+import Control.Lens.Operators ((.~), (<&>))
 import Data.String.Conversions (convertString)
 import Data.String.Interpolate (i)
 import Data.Text (Text)
+import Data.UUID qualified as UUID
 import HLox.Parser (parse, parseExpr, pretty)
 import HLox.Parser.Types
 import HLox.Scanner (scanTokens)
@@ -13,8 +15,6 @@ import System.FilePath ((</>))
 import Test.Hspec (SpecWith, describe, expectationFailure, it, shouldBe)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Golden (goldenVsString)
-import Data.UUID qualified as UUID
-import Control.Lens.Operators ((<&>), (.~))
 
 testValidParserExpr :: String -> Text -> TestTree
 testValidParserExpr name input = goldenVsString name ("golden" </> "parser" </> name) $ do
