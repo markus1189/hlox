@@ -17,11 +17,7 @@ import Control.Monad.Writer.Class (MonadWriter, tell)
 import Data.Foldable (for_, traverse_)
 import Data.List (findIndex)
 import Data.Map.Strict qualified as Map
-import Data.String.Interpolate (i)
-import Data.Text (Text)
-import Debug.Trace (traceShowM)
 import HLox.Parser.Types
-import HLox.Pretty (Pretty (pretty))
 import HLox.Resolver.Types
 import HLox.Scanner.Types
 
@@ -53,7 +49,6 @@ resolve1 (StmtIf _ cond ifTrue ifFalse) = do
   traverse_ resolve1 ifFalse
 resolve1 (StmtPrint _ expr) = resolveExpr expr
 resolve1 (StmtReturn _ keyword expr) = do
-  traceShowM @Text $ [i|@@@@@@@@@@@@@@@@@@@@ #{fmap pretty expr}|]
   curFunc <- use currentFunction
   when (curFunc == FunctionTypeNone) . tell . pure $ ResolverError keyword "Can't return from top-level code."
   traverse_ resolveExpr expr
