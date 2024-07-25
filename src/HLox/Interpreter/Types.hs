@@ -3,14 +3,14 @@ module HLox.Interpreter.Types where
 import Control.Lens.TH (makeFields, makePrisms)
 import Data.HashTable.IO qualified as H
 import Data.List.NonEmpty (NonEmpty)
+import Data.Map.Strict (Map)
 import Data.String.Interpolate (i)
 import Data.Text (Text)
 import Formatting (sformat, shortest)
 import HLox.Parser.Types (Stmt)
 import HLox.Pretty (Pretty, pretty)
-import HLox.Resolver.Types (DepthMap, HasDepthMap(..))
+import HLox.Resolver.Types (DepthMap, HasDepthMap (..))
 import HLox.Scanner.Types (Token)
-import Data.Map.Strict (Map)
 
 type HashTable k v = H.CuckooHashTable k v
 
@@ -31,13 +31,13 @@ data LoxValue
 
 data LoxFunction = LoxFunction ![Text] !Environment ![Stmt] deriving (Show, Eq, Ord)
 
-data LoxInstance = LoxInstance  !Klass !InstanceFields deriving (Show, Eq, Ord)
+data LoxInstance = LoxInstance !Klass !InstanceFields deriving (Show, Eq, Ord)
 
 data Klass = Klass !Text !KlassMethods deriving (Show, Eq, Ord)
 
-newtype KlassMethods = KlassMethods (Map Text LoxFunction ) deriving (Show, Eq, Ord)
+newtype KlassMethods = KlassMethods (Map Text LoxFunction) deriving (Show, Eq, Ord)
 
-newtype InstanceFields = InstanceFields (HashTable Text LoxValue)  deriving (Show)
+newtype InstanceFields = InstanceFields (HashTable Text LoxValue) deriving (Show)
 
 instance Eq InstanceFields where
   _ == _ = False

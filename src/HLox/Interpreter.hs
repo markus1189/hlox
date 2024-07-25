@@ -21,6 +21,7 @@ import Control.Monad.Writer.Class (tell)
 import Data.Either.Combinators (maybeToRight)
 import Data.Foldable (for_, traverse_)
 import Data.HashTable.IO qualified as H
+import Data.Map.Strict qualified as Map
 import Data.Maybe (fromMaybe)
 import Data.String.Interpolate (i)
 import Data.Text qualified as Text
@@ -30,12 +31,11 @@ import Data.UUID (UUID)
 import HLox.Interpreter.Environment (assignAt, assignGlobal)
 import HLox.Interpreter.Environment qualified as Env
 import HLox.Interpreter.Types
-import HLox.Parser.Types (Expr (..), Stmt (..), StmtFunctionLit (StmtFunctionLit), toName, exprId)
+import HLox.Parser.Types (Expr (..), Stmt (..), StmtFunctionLit (StmtFunctionLit), exprId, toName)
 import HLox.Resolver.Types
 import HLox.Scanner.Types
 import HLox.Types (Lox)
 import HLox.Util (loxRuntimeError)
-import qualified Data.Map.Strict as Map
 
 eval :: (Traversable t) => DepthMap -> Environment -> t Stmt -> Lox ()
 eval dm env stmts = do
@@ -217,7 +217,7 @@ instanceSet (toName -> name) v (InstanceFields fields) = do
   liftIO $ H.insert fields name v
 
 instanceGet :: (MonadError InterpretError m, MonadIO m) => Token -> LoxInstance -> m LoxValue
-instanceGet name inst@(LoxInstance (Klass _  (KlassMethods ms)) (InstanceFields fields)) = do
+instanceGet name inst@(LoxInstance (Klass _ (KlassMethods ms)) (InstanceFields fields)) = do
   fld <- liftIO $ H.lookup fields (toName name)
   let mtd = Map.lookup (toName name) ms
   case fld of

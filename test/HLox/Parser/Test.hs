@@ -36,15 +36,17 @@ testValidParser name input = goldenVsString name ("golden" </> "parser_stmt" </>
 
 spec_simpleAst :: SpecWith ()
 spec_simpleAst = do
-  describe "Pretty printer" . it "should print a simple ast" $ (do
-    let e =
-          ExprBinary
-            UUID.nil
-            (ExprUnary UUID.nil (Token MINUS (Lexeme "-") LitNothing (Line 1)) (ExprLiteral UUID.nil (LitNumber 123)))
-            (Token STAR (Lexeme "*") LitNothing (Line 1))
-            (ExprGrouping UUID.nil (ExprLiteral UUID.nil (LitNumber 45.67)))
-        result = pretty e
-    result `shouldBe` "(* (- 123) (group 45.67))")
+  describe "Pretty printer" . it "should print a simple ast" $
+    ( do
+        let e =
+              ExprBinary
+                UUID.nil
+                (ExprUnary UUID.nil (Token MINUS (Lexeme "-") LitNothing (Line 1)) (ExprLiteral UUID.nil (LitNumber 123)))
+                (Token STAR (Lexeme "*") LitNothing (Line 1))
+                (ExprGrouping UUID.nil (ExprLiteral UUID.nil (LitNumber 45.67)))
+            result = pretty e
+        result `shouldBe` "(* (- 123) (group 45.67))"
+    )
 
   describe "Parser" $ do
     describe "expressions" $ do
@@ -116,7 +118,10 @@ spec_simpleAst = do
         result `shouldBe` Right "(sequence (call average (list 1 2)))"
 
       it "should parse classes" $ do
-        result <- fmap pretty <$> parse' [i|class DevonshireCream {
+        result <-
+          fmap pretty
+            <$> parse'
+              [i|class DevonshireCream {
                                               serveOn() {
                                                 return "Scones";
                                               }
@@ -125,7 +130,6 @@ spec_simpleAst = do
                                             print DevonshireCream;
                                            |]
         result `shouldBe` Right "(sequence (class DevonshireCream (methods (declare-fun serveOn () (sequence (return Scones))))) (print DevonshireCream))"
-
 
 test_goldenParser :: TestTree
 test_goldenParser =

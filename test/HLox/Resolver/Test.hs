@@ -1,17 +1,17 @@
 module HLox.Resolver.Test where
 
+import Control.Monad.Extra (whenM)
+import Control.Monad.IO.Class (liftIO)
 import Data.String.Interpolate (i)
 import Data.Text (Text)
 import HLox.Parser (parse)
 import HLox.Resolver (resolve)
-import HLox.Scanner (scanTokens)
-import HLox.Types
-import Test.Hspec
 import HLox.Resolver.Types
-import Control.Monad.Extra (whenM)
-import HLox.Util (loxHadError)
-import Control.Monad.IO.Class (liftIO)
+import HLox.Scanner (scanTokens)
 import HLox.Scanner.Types
+import HLox.Types
+import HLox.Util (loxHadError)
+import Test.Hspec
 
 spec_simpleAst :: SpecWith ()
 spec_simpleAst = do
@@ -25,6 +25,9 @@ spec_simpleAst = do
     it "should detect multi declaration in scopes" $ do
       result <- resolve' [i|{ var a = "first"; var a = "second"; }|]
       result `shouldBe` (DepthMap mempty, [ResolverError (Token IDENTIFIER (Lexeme "a") LitNothing (Line 1)) "Already a variable with this name in this scope."])
+    it "should detect usage of 'this' outside a class" $ do
+      result <- resolve' [i|{ print this; }|]
+      result `shouldBe` (DepthMap mempty, [ResolverError (Token THIS (Lexeme "this") LitNothing (Line 1)) "Can't use 'this' outside of a class."])
 
 resolve' :: Text -> IO (DepthMap, [ResolverError])
 resolve' input = do

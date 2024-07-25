@@ -80,7 +80,7 @@ parseFunction kind = do
     void . lift $ createError t "Can't have more than 255 arguments."
   void $ consume RIGHT_PAREN "Expect ')' after parameters."
   void $ consume LEFT_BRACE [i|Expect '{' before #{kind} body.|]
-  (StmtFunctionLit <$> freshId <*> pure name <*> pure parameters <*> parseBlock)
+  StmtFunctionLit <$> freshId <*> pure name <*> pure parameters <*> parseBlock
 
 parseVarDeclaration :: StateT ParseState Lox Stmt
 parseVarDeclaration = do

@@ -2,6 +2,8 @@ module HLox.Parser.Types where
 
 import Control.Exception (Exception)
 import Control.Lens.Type (Lens')
+import Data.Map.Strict (Map)
+import Data.Map.Strict qualified as Map
 import Data.String.Interpolate (i)
 import Data.Text (Text)
 import Data.Text qualified as Text
@@ -10,8 +12,6 @@ import Formatting (build, sformat)
 import Formatting.Formatters (shortest)
 import HLox.Pretty (Pretty, pretty)
 import HLox.Scanner.Types
-import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
 
 data Expr
   = ExprAssign !UUID !Token !Expr
@@ -76,6 +76,7 @@ data Stmt
 data StmtFunctionLit = StmtFunctionLit !UUID !Token ![Token] ![Stmt] deriving (Show, Eq, Ord)
 
 data ClassMethod = ClassMethod !UUID !Token ![Token] ![Stmt] deriving (Show, Eq, Ord)
+
 instance Pretty ClassMethod where
   pretty (ClassMethod _ name params body) = [i|(method #{pretty name} #{prettyList params} #{pretty body})|]
 

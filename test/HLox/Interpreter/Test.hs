@@ -231,7 +231,8 @@ spec_interpreterPrograms = do
       result `shouldBe` Right [LoxEffectPrint "<instance Bagel <HashTable>>"]
 
     it "should support get and set on instances" $ do
-      let program = [i|class Donut {}
+      let program =
+            [i|class Donut {}
 
                        var donut = Donut();
                        donut.topping = "Chocolate";
@@ -241,7 +242,8 @@ spec_interpreterPrograms = do
       result `shouldBe` Right [LoxEffectPrint "Chocolate"]
 
     it "should support class methods" $ do
-      let program = [i|class Bacon {
+      let program =
+            [i|class Bacon {
                         eat() {
                           print "Crunch crunch crunch!";
                         }
@@ -253,7 +255,8 @@ spec_interpreterPrograms = do
       result `shouldBe` Right [LoxEffectPrint "Crunch crunch crunch!"]
 
     it "should bind this" $ do
-      let program = [i|class Cake {
+      let program =
+            [i|class Cake {
                          taste() {
                            var adjective = "delicious";
                            print "The " + this.flavor + " cake is " + adjective + "!";

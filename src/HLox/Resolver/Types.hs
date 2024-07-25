@@ -20,10 +20,13 @@ data FunctionType
   | FunctionTypeMethod
   deriving (Show, Eq, Ord)
 
+data ClassType = ClassTypeNone | ClassTypeClass deriving (Show, Eq, Ord)
+
 data ResolverState = ResolverState
   { resolverStateScopeStack :: !ScopeStack,
     resolverStateDepthMap :: !DepthMap,
-    resolverStateCurrentFunction :: !FunctionType
+    resolverStateCurrentFunction :: !FunctionType,
+    resolverStateClassType :: !ClassType
   }
 
 makeFields ''ResolverState

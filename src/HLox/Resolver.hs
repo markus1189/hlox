@@ -11,6 +11,7 @@ import Control.Lens.Combinators
   )
 import Control.Lens.Operators ((%=), (.=), (<<.=), (?=), (^.))
 import Control.Monad (when)
+import Control.Monad.Extra (whenM)
 import Control.Monad.RWS.Strict (runRWS)
 import Control.Monad.State.Class (MonadState)
 import Control.Monad.Writer.Class (MonadWriter, tell)
@@ -26,14 +27,14 @@ scopeEmpty (ScopeStack []) = True
 scopeEmpty (ScopeStack (_ : _)) = False
 
 resolve :: (Foldable t) => t Stmt -> (DepthMap, [ResolverError])
-resolve stmts = pick $ runRWS (resolveAll stmts) () (ResolverState (ScopeStack mempty) (DepthMap mempty) FunctionTypeNone)
+resolve stmts = pick $ runRWS (resolveAll stmts) () (ResolverState (ScopeStack mempty) (DepthMap mempty) FunctionTypeNone ClassTypeNone)
   where
     pick (_, s, w) = (view depthMap s, w)
 
-resolveAll :: (Foldable t, HasCurrentFunction s FunctionType, HasDepthMap s DepthMap, HasScopeStack s ScopeStack, MonadWriter [ResolverError] m, MonadState s m) => t Stmt -> m ()
+resolveAll :: (Foldable t, HasCurrentFunction s FunctionType, HasDepthMap s DepthMap, HasScopeStack s ScopeStack, MonadWriter [ResolverError] m, MonadState s m, HasClassType s ClassType) => t Stmt -> m ()
 resolveAll = traverse_ resolve1
 
-resolve1 :: (HasCurrentFunction s FunctionType, HasDepthMap s DepthMap, HasScopeStack s ScopeStack, MonadWriter [ResolverError] m, MonadState s m) => Stmt -> m ()
+resolve1 :: (HasCurrentFunction s FunctionType, HasDepthMap s DepthMap, HasScopeStack s ScopeStack, MonadWriter [ResolverError] m, MonadState s m, HasClassType s ClassType) => Stmt -> m ()
 resolve1 (StmtVar _ n initializer) = do
   declare n
   traverse_ resolveExpr initializer
@@ -58,6 +59,7 @@ resolve1 (StmtBlock _ stmts) = do
   resolveAll stmts
   endScope
 resolve1 (StmtClass _ name methods) = do
+  enclosingClass <- classType <<.= ClassTypeClass
   declare name
   define name
 
@@ -65,13 +67,15 @@ resolve1 (StmtClass _ name methods) = do
   scopeStack . _ScopeStack . _head . at "this" ?= Initialized
   for_ methods $ resolveFunction FunctionTypeMethod
   endScope
+  classType .= enclosingClass
 
 resolveFunction ::
   ( HasCurrentFunction s FunctionType,
     HasDepthMap s DepthMap,
     HasScopeStack s ScopeStack,
     MonadWriter [ResolverError] m,
-    MonadState s m
+    MonadState s m,
+    HasClassType s ClassType
   ) =>
   FunctionType ->
   StmtFunctionLit ->
@@ -90,7 +94,8 @@ resolveExpr ::
   ( HasDepthMap s DepthMap,
     HasScopeStack s ScopeStack,
     MonadWriter [ResolverError] m,
-    MonadState s m
+    MonadState s m,
+    HasClassType s ClassType
   ) =>
   Expr ->
   m ()
@@ -113,7 +118,9 @@ resolveExpr (ExprLogical _ lhs _ rhs) = resolveExpr lhs *> resolveExpr rhs
 resolveExpr (ExprUnary _ _ expr) = resolveExpr expr
 resolveExpr (ExprGet _ expr _) = resolveExpr expr
 resolveExpr (ExprSet _ obj _ v) = resolveExpr v >> resolveExpr obj
-resolveExpr expr@(ExprThis _ t) = resolveLocal expr t
+resolveExpr expr@(ExprThis _ t) = do
+  whenM ((== ClassTypeNone) <$> use classType) $ tell . pure $ ResolverError t "Can't use 'this' outside of a class."
+  resolveLocal expr t
 
 beginScope :: (HasScopeStack s ScopeStack, MonadState s m) => m ()
 beginScope = scopeStack . _ScopeStack %= (mempty :)

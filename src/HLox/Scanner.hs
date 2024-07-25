@@ -52,14 +52,17 @@ reservedKeywords =
     ]
 
 scanTokens :: Text -> ([Token], [ScanError])
-scanTokens script = over _2 (view ssErrors) . flip runState (ScanState 0 0 (Line 1) script (Text.length script) [] []) $ (do
-  whileM_ (not <$> scannerIsAtEnd) $ do
-    current <- use ssCurrent
-    ssStart .= current
-    scanToken
-  line' <- use ssLine
-  ssTokens %= (++ [Token EOF (Lexeme "") LitNothing line'])
-  use ssTokens)
+scanTokens script =
+  over _2 (view ssErrors) . flip runState (ScanState 0 0 (Line 1) script (Text.length script) [] []) $
+    ( do
+        whileM_ (not <$> scannerIsAtEnd) $ do
+          current <- use ssCurrent
+          ssStart .= current
+          scanToken
+        line' <- use ssLine
+        ssTokens %= (++ [Token EOF (Lexeme "") LitNothing line'])
+        use ssTokens
+    )
 
 scanToken :: State ScanState ()
 scanToken = do
