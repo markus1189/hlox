@@ -240,6 +240,19 @@ spec_interpreterPrograms = do
       result <- interpretStmt' program
       result `shouldBe` Right [LoxEffectPrint "Chocolate"]
 
+    it "should support class methods" $ do
+      let program = [i|class Bacon {
+                        eat() {
+                          print "Crunch crunch crunch!";
+                        }
+                       }
+
+                       Bacon().eat();
+                      |]
+      result <- interpretStmt' program
+      result `shouldBe` Right [LoxEffectPrint "Crunch crunch crunch!"]
+
+
 evalExpr' :: Text -> IO (Either InterpretError LoxValue)
 evalExpr' input = do
   loxEnv <- makeLoxEnv

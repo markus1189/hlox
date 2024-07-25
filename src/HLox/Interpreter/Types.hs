@@ -10,6 +10,7 @@ import HLox.Parser.Types (Stmt)
 import HLox.Pretty (Pretty, pretty)
 import HLox.Resolver.Types (DepthMap, HasDepthMap(..))
 import HLox.Scanner.Types (Token)
+import Data.Map.Strict (Map)
 
 type HashTable k v = H.CuckooHashTable k v
 
@@ -22,13 +23,17 @@ data LoxValue
   | LoxText !Text
   | LoxNumber !Double
   | LoxBool !Bool
-  | LoxFun ![Text] !Environment ![Stmt]
+  | LoxFun !LoxFunction
   | LoxNativeFun !LoxNativeFunKind
   | LoxClass !Klass
-  | LoxInstance !Klass InstanceFields
+  | LoxInstance !Klass !InstanceFields
   deriving (Show, Eq, Ord)
 
-data Klass = Klass !Text deriving (Show, Eq, Ord)
+data LoxFunction = LoxFunction ![Text] !Environment ![Stmt] deriving (Show, Eq, Ord)
+
+data Klass = Klass !Text !KlassMethods deriving (Show, Eq, Ord)
+
+newtype KlassMethods = KlassMethods (Map Text LoxFunction ) deriving (Show, Eq, Ord)
 
 newtype InstanceFields = InstanceFields (HashTable Text LoxValue)  deriving (Show)
 
@@ -49,8 +54,8 @@ stringify (LoxBool True) = "true"
 stringify (LoxBool False) = "false"
 stringify (LoxFun {}) = "<function>"
 stringify (LoxNativeFun k) = [i|<native function: #{show k}>|]
-stringify (LoxClass (Klass n)) = [i|<class #{n}>|]
-stringify (LoxInstance (Klass n) (InstanceFields fields)) = [i|<instance #{n} #{fields}>|]
+stringify (LoxClass (Klass n _)) = [i|<class #{n}>|]
+stringify (LoxInstance (Klass n _) (InstanceFields fields)) = [i|<instance #{n} #{fields}>|]
 
 data InterpretError
   = InterpretRuntimeError !Token !Text
