@@ -240,4 +240,4 @@ interpretStmt' input = do
   let (tokens, _) = scanTokens input
   Right result <- flip runLox loxEnv $ parse tokens
   let (dm, []) = resolve result
-  runExceptT $ execWriterT $ flip evalStateT (InterpreterState env dm) $ evalPure result
+  runExceptT . execWriterT $ evalStateT (evalPure result) (InterpreterState env dm)

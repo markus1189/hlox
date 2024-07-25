@@ -9,31 +9,25 @@ import Control.Lens.Combinators
     view,
     _head,
   )
-import Control.Lens.Operators ((%=), (?=), (^.), (.=), (<<.=))
+import Control.Lens.Operators ((%=), (.=), (<<.=), (?=), (^.))
+import Control.Monad (when)
 import Control.Monad.RWS.Strict (runRWS)
 import Control.Monad.State.Class (MonadState)
 import Control.Monad.Writer.Class (MonadWriter, tell)
 import Data.Foldable (for_, traverse_)
 import Data.List (findIndex)
-import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
+import Data.String.Interpolate (i)
 import Data.Text (Text)
+import Debug.Trace (traceShowM)
 import HLox.Parser.Types
+import HLox.Pretty (Pretty (pretty))
 import HLox.Resolver.Types
 import HLox.Scanner.Types
-import Control.Monad (when)
-import Debug.Trace (traceShowM)
-import HLox.Pretty (Pretty(pretty))
-import Data.String.Interpolate (i)
-
 
 scopeEmpty :: ScopeStack -> Bool
 scopeEmpty (ScopeStack []) = True
 scopeEmpty (ScopeStack (_ : _)) = False
-
-scopePeek :: ScopeStack -> Maybe (Map Text InitializeStatus)
-scopePeek (ScopeStack []) = Nothing
-scopePeek (ScopeStack (x : _)) = Just x
 
 resolve :: (Foldable t) => t Stmt -> (DepthMap, [ResolverError])
 resolve stmts = pick $ runRWS (resolveAll stmts) () (ResolverState (ScopeStack mempty) (DepthMap mempty) FunctionTypeNone)
@@ -61,7 +55,7 @@ resolve1 (StmtPrint _ expr) = resolveExpr expr
 resolve1 (StmtReturn _ keyword expr) = do
   traceShowM @Text $ [i|@@@@@@@@@@@@@@@@@@@@ #{fmap pretty expr}|]
   curFunc <- use currentFunction
-  when (curFunc == FunctionTypeNone) $ tell . pure $ ResolverError keyword "Can't return from top-level code."
+  when (curFunc == FunctionTypeNone) . tell . pure $ ResolverError keyword "Can't return from top-level code."
   traverse_ resolveExpr expr
 resolve1 (StmtWhile _ c body) = resolveExpr c >> resolve1 body
 resolve1 (StmtBlock _ stmts) = do
@@ -114,7 +108,7 @@ declare :: (MonadWriter [ResolverError] m, HasScopeStack s ScopeStack, MonadStat
 declare n = do
   let n' = n ^. lexeme . _Lexeme
   scope <- use $ scopeStack . _ScopeStack . _head
-  when (Map.member n' scope) $ tell . pure $ ResolverError n "Already a variable with this name in this scope."
+  when (Map.member n' scope) . tell . pure $ ResolverError n "Already a variable with this name in this scope."
   scopeStack . _ScopeStack . _head . at n' ?= Uninitialized
 
 define :: (HasScopeStack s ScopeStack, MonadState s m) => Token -> m ()
@@ -123,7 +117,7 @@ define n = scopeStack . _ScopeStack . _head . at (n ^. lexeme . _Lexeme) ?= Init
 resolveLocal :: (HasDepthMap s DepthMap, HasScopeStack s ScopeStack, MonadWriter [ResolverError] m, MonadState s m) => Expr -> Token -> m ()
 resolveLocal expr name = do
   maybeDepth <- use (scopeStack . to (findDepth name))
-  for_ maybeDepth $ \i -> depthMap . _DepthMap %= Map.insert (expr ^. exprId) i
+  for_ maybeDepth $ \idx -> depthMap . _DepthMap %= Map.insert (expr ^. exprId) idx
 
 findDepth :: Token -> ScopeStack -> Maybe Int
-findDepth (view (lexeme . _Lexeme) -> name) (ScopeStack ss) = (\i -> length ss - 1 - i) <$> findIndex (Map.member name) (reverse ss)
+findDepth (view (lexeme . _Lexeme) -> name) (ScopeStack ss) = (\idx -> length ss - 1 - idx) <$> findIndex (Map.member name) (reverse ss)

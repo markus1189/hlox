@@ -15,3 +15,5 @@
 - group: {name: extra, enabled: true}
 - group: {name: use-lens, enabled: true}
 - group: {name: dollar, enabled: true}
+
+- ignore: {name: "Redundant $"}

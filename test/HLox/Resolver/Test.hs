@@ -26,7 +26,7 @@ resolve' input = do
   let (tokens, _) = scanTokens input
   Right result <- flip runLox loxEnv $ do
     r <- parse tokens
-    whenM loxHadError $ liftIO $ expectationFailure "Errors while parsing"
+    whenM loxHadError . liftIO $ expectationFailure "Errors while parsing"
     pure r
 
   pure $ resolve result

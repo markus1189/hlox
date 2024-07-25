@@ -32,9 +32,7 @@ $(deriveJSON defaultOptions {constructorTagModifier = drop (length @[] "StoredSc
 testScanner :: String -> Text -> TestTree
 testScanner name input = goldenVsString name ("golden" </> name) $ do
   let (tokens, errors) = scanTokens input
-  pure $
-    encodePretty $
-      Aeson.object
+  pure . encodePretty $ Aeson.object
         [ "tokens" Aeson..= fmap toStoredToken tokens,
           "errors" Aeson..= fmap toStoredScanError errors
         ]

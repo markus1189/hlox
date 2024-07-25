@@ -25,10 +25,9 @@ import HLox.Scanner.Types
 import HLox.Types (Lox, MonadFreshId, freshId)
 import HLox.Util (loxReport)
 
-data ParseState = ParseState
-  { _psCurrent :: !Int,
-    _psTokens :: Vector Token
-  }
+data ParseState where
+  ParseState :: {_psCurrent :: !Int, _psTokens :: !(Vector Token)} ->
+                  ParseState
   deriving (Show)
 
 makeLenses ''ParseState
@@ -67,7 +66,7 @@ parseFunction kind = do
     consume IDENTIFIER "Expect parameter name." `untilM` (not <$> match [COMMA])
   when (length parameters >= 255) $ do
     t <- peek
-    void $ lift $ createError t "Can't have more than 255 arguments."
+    void . lift $ createError t "Can't have more than 255 arguments."
   void $ consume RIGHT_PAREN "Expect ')' after parameters."
   void $ consume LEFT_BRACE [i|Expect '{' before #{kind} body.|]
   StmtFunction <$> freshId <*> pure name <*> pure parameters <*> parseBlock

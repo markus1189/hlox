@@ -23,7 +23,7 @@ testValidParserExpr name input = goldenVsString name ("golden" </> "parser" </> 
   result <- flip runLox env $ parseExpr tokens
   case result of
     Left err -> throwIO err
-    Right expr -> pure $ convertString $ pretty expr
+    Right expr -> pure . convertString $ pretty expr
 
 testValidParser :: String -> Text -> TestTree
 testValidParser name input = goldenVsString name ("golden" </> "parser_stmt" </> name) $ do
@@ -32,20 +32,19 @@ testValidParser name input = goldenVsString name ("golden" </> "parser_stmt" </>
   result <- flip runLox env $ parse tokens
   case result of
     Left err -> throwIO err
-    Right expr -> pure $ convertString $ pretty expr
+    Right expr -> pure . convertString $ pretty expr
 
 spec_simpleAst :: SpecWith ()
 spec_simpleAst = do
-  describe "Pretty printer" $ do
-    it "should print a simple ast" $ do
-      let e =
-            ExprBinary
-              UUID.nil
-              (ExprUnary UUID.nil (Token MINUS (Lexeme "-") LitNothing (Line 1)) (ExprLiteral UUID.nil (LitNumber 123)))
-              (Token STAR (Lexeme "*") LitNothing (Line 1))
-              (ExprGrouping UUID.nil (ExprLiteral UUID.nil (LitNumber 45.67)))
-          result = pretty e
-      result `shouldBe` "(* (- 123) (group 45.67))"
+  describe "Pretty printer" . it "should print a simple ast" $ (do
+    let e =
+          ExprBinary
+            UUID.nil
+            (ExprUnary UUID.nil (Token MINUS (Lexeme "-") LitNothing (Line 1)) (ExprLiteral UUID.nil (LitNumber 123)))
+            (Token STAR (Lexeme "*") LitNothing (Line 1))
+            (ExprGrouping UUID.nil (ExprLiteral UUID.nil (LitNumber 45.67)))
+        result = pretty e
+    result `shouldBe` "(* (- 123) (group 45.67))")
 
   describe "Parser" $ do
     describe "expressions" $ do
