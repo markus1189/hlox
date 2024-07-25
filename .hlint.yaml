@@ -18,3 +18,5 @@
 
 - ignore: {name: "Redundant $"}
 - ignore: {name: "Move brackets to avoid $"}
+- ignore: {name: "Infinite: base/length"}
+- ignore: {name: "Infinite: base/reverse"}
