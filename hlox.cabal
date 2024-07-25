@@ -103,6 +103,7 @@ test-suite hlox-test
     default-language: GHC2021
     other-modules:    HLox.Interpreter.Test
                     , HLox.Parser.Test
+                    , HLox.Resolver.Test
                     , HLox.Scanner.Test
     -- other-extensions:
     type:             exitcode-stdio-1.0

@@ -8,7 +8,7 @@ import Data.Text (Text)
 import Formatting (sformat, shortest)
 import HLox.Parser.Types (Stmt)
 import HLox.Pretty (Pretty, pretty)
-import HLox.Resolver.Types (DepthMap)
+import HLox.Resolver.Types (DepthMap, HasDepthMap(..))
 import HLox.Scanner.Types (Token)
 
 type HashTable k v = H.CuckooHashTable k v

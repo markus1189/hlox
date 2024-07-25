@@ -1,6 +1,6 @@
 module HLox.Resolver.Types where
 
-import Control.Lens.TH (makePrisms)
+import Control.Lens.TH (makeFields, makePrisms)
 import Data.Map.Strict (Map)
 import Data.Text (Text)
 import Data.UUID (UUID)
@@ -14,5 +14,17 @@ newtype DepthMap = DepthMap (Map UUID Int) deriving (Show, Eq, Ord)
 
 data ResolverError = ResolverError !Token !Text deriving (Show, Eq)
 
+data FunctionType
+  = FunctionTypeNone
+  | FunctionTypeFunction
+  deriving (Show, Eq, Ord)
+
+data ResolverState = ResolverState
+  { resolverStateScopeStack :: !ScopeStack,
+    resolverStateDepthMap :: !DepthMap,
+    resolverStateCurrentFunction :: !FunctionType
+  }
+
+makeFields ''ResolverState
 makePrisms ''ScopeStack
 makePrisms ''DepthMap

@@ -9,8 +9,7 @@ import Control.Lens.Combinators
     view,
     _head,
   )
-import Control.Lens.Operators ((%=), (?=), (^.))
-import Control.Lens.TH (makeFields)
+import Control.Lens.Operators ((%=), (?=), (^.), (.=), (<<.=))
 import Control.Monad.RWS.Strict (runRWS)
 import Control.Monad.State.Class (MonadState)
 import Control.Monad.Writer.Class (MonadWriter, tell)
@@ -22,13 +21,11 @@ import Data.Text (Text)
 import HLox.Parser.Types
 import HLox.Resolver.Types
 import HLox.Scanner.Types
+import Control.Monad (when)
+import Debug.Trace (traceShowM)
+import HLox.Pretty (Pretty(pretty))
+import Data.String.Interpolate (i)
 
-data ResolverState = ResolverState
-  { resolverStateScopeStack :: !ScopeStack,
-    resolverStateDepthMap :: !DepthMap
-  }
-
-makeFields ''ResolverState
 
 scopeEmpty :: ScopeStack -> Bool
 scopeEmpty (ScopeStack []) = True
@@ -39,14 +36,14 @@ scopePeek (ScopeStack []) = Nothing
 scopePeek (ScopeStack (x : _)) = Just x
 
 resolve :: (Foldable t) => t Stmt -> (DepthMap, [ResolverError])
-resolve stmts = pick $ runRWS (resolveAll stmts) () (ResolverState (ScopeStack mempty) (DepthMap mempty))
+resolve stmts = pick $ runRWS (resolveAll stmts) () (ResolverState (ScopeStack mempty) (DepthMap mempty) FunctionTypeNone)
   where
     pick (_, s, w) = (view depthMap s, w)
 
-resolveAll :: (Foldable t, HasDepthMap s DepthMap, HasScopeStack s ScopeStack, MonadWriter [ResolverError] m, MonadState s m) => t Stmt -> m ()
+resolveAll :: (Foldable t, HasCurrentFunction s FunctionType, HasDepthMap s DepthMap, HasScopeStack s ScopeStack, MonadWriter [ResolverError] m, MonadState s m) => t Stmt -> m ()
 resolveAll = traverse_ resolve1
 
-resolve1 :: (HasDepthMap s DepthMap, HasScopeStack s ScopeStack, MonadWriter [ResolverError] m, MonadState s m) => Stmt -> m ()
+resolve1 :: (HasCurrentFunction s FunctionType, HasDepthMap s DepthMap, HasScopeStack s ScopeStack, MonadWriter [ResolverError] m, MonadState s m) => Stmt -> m ()
 resolve1 (StmtVar _ n initializer) = do
   declare n
   traverse_ resolveExpr initializer
@@ -61,21 +58,27 @@ resolve1 (StmtIf _ cond ifTrue ifFalse) = do
   resolve1 ifTrue
   traverse_ resolve1 ifFalse
 resolve1 (StmtPrint _ expr) = resolveExpr expr
-resolve1 (StmtReturn _ _ expr) = traverse_ resolveExpr expr
+resolve1 (StmtReturn _ keyword expr) = do
+  traceShowM @Text $ [i|@@@@@@@@@@@@@@@@@@@@ #{fmap pretty expr}|]
+  curFunc <- use currentFunction
+  when (curFunc == FunctionTypeNone) $ tell . pure $ ResolverError keyword "Can't return from top-level code."
+  traverse_ resolveExpr expr
 resolve1 (StmtWhile _ c body) = resolveExpr c >> resolve1 body
 resolve1 (StmtBlock _ stmts) = do
   beginScope
   resolveAll stmts
   endScope
 
-resolveFunction :: (HasDepthMap s DepthMap, HasScopeStack s ScopeStack, MonadWriter [ResolverError] m, MonadState s m) => [Token] -> [Stmt] -> m ()
+resolveFunction :: (HasCurrentFunction s FunctionType, HasDepthMap s DepthMap, HasScopeStack s ScopeStack, MonadWriter [ResolverError] m, MonadState s m) => [Token] -> [Stmt] -> m ()
 resolveFunction params body = do
+  enclosingFunction <- currentFunction <<.= FunctionTypeFunction
   beginScope
   for_ params $ \param -> do
     declare param
     define param
   resolveAll body
   endScope
+  currentFunction .= enclosingFunction
 
 resolveExpr :: (HasDepthMap s DepthMap, HasScopeStack s ScopeStack, MonadWriter [ResolverError] m, MonadState s m) => Expr -> m ()
 resolveExpr expr@(ExprVariable _ n) = do
@@ -107,8 +110,12 @@ endScope =
     [] -> []
     (_ : xs) -> xs
 
-declare :: (HasScopeStack s ScopeStack, MonadState s m) => Token -> m ()
-declare n = scopeStack . _ScopeStack . _head . at (n ^. lexeme . _Lexeme) ?= Uninitialized
+declare :: (MonadWriter [ResolverError] m, HasScopeStack s ScopeStack, MonadState s m) => Token -> m ()
+declare n = do
+  let n' = n ^. lexeme . _Lexeme
+  scope <- use $ scopeStack . _ScopeStack . _head
+  when (Map.member n' scope) $ tell . pure $ ResolverError n "Already a variable with this name in this scope."
+  scopeStack . _ScopeStack . _head . at n' ?= Uninitialized
 
 define :: (HasScopeStack s ScopeStack, MonadState s m) => Token -> m ()
 define n = scopeStack . _ScopeStack . _head . at (n ^. lexeme . _Lexeme) ?= Initialized
