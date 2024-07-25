@@ -23,9 +23,12 @@ data Expr
   | ExprGrouping !UUID !Expr
   | ExprLiteral !UUID !Literal
   | ExprUnary !UUID !Token !Expr
-  | ExprVariable !UUID !Token
+  | ExprVariable !ExprVar
   | ExprThis !UUID !Token
+  | ExprSuper !UUID !Token !Token
   deriving (Show, Eq, Ord)
+
+data ExprVar = ExprVar !UUID !Token deriving (Show, Eq, Ord)
 
 exprId :: Lens' Expr UUID
 exprId f (ExprAssign uid name value) = fmap (\uid' -> ExprAssign uid' name value) (f uid)
@@ -37,8 +40,9 @@ exprId f (ExprSet uid object name value) = fmap (\uid' -> ExprSet uid' object na
 exprId f (ExprGrouping uid e) = fmap (`ExprGrouping` e) (f uid)
 exprId f (ExprLiteral uid lit) = fmap (`ExprLiteral` lit) (f uid)
 exprId f (ExprUnary uid op e) = fmap (\uid' -> ExprUnary uid' op e) (f uid)
-exprId f (ExprVariable uid t) = fmap (`ExprVariable` t) (f uid)
+exprId f (ExprVariable (ExprVar uid t)) = fmap (ExprVariable . (`ExprVar` t)) (f uid)
 exprId f (ExprThis uid t) = fmap (`ExprThis` t) (f uid)
+exprId f (ExprSuper uid keyword method) = fmap (\uid' -> ExprSuper uid keyword method) (f uid)
 
 instance Pretty Expr where
   pretty :: Expr -> Text
@@ -50,12 +54,16 @@ instance Pretty Expr where
   pretty (ExprLiteral _ (LitNumber num)) = sformat shortest num
   pretty (ExprLiteral _ (LitBool b)) = sformat build b
   pretty (ExprUnary _ op e) = [i|(#{pretty op} #{pretty e})|]
-  pretty (ExprVariable _ t) = pretty t
+  pretty (ExprVariable v) = pretty v
   pretty (ExprAssign _ name v) = [i|(reassign #{pretty name} #{pretty v})|]
   pretty (ExprCall _ callee _ arguments) = [i|(call #{pretty callee} #{prettyList arguments})|]
   pretty (ExprGet _ object name) = [i|(get #{pretty object} #{pretty name})|]
   pretty (ExprSet _ object name value) = [i|(set #{pretty object} #{pretty name} #{pretty value})|]
   pretty (ExprThis _ _) = "this"
+  pretty (ExprSuper _ _ method) = [i|super.#{pretty method}|]
+
+instance Pretty ExprVar where
+  pretty (ExprVar _ t) = pretty t
 
 prettyList :: (Pretty a) => [a] -> Text
 prettyList [] = "()"
@@ -70,7 +78,7 @@ data Stmt
   | StmtVar !UUID !Token !(Maybe Expr)
   | StmtWhile !UUID !Expr !Stmt
   | StmtBlock !UUID ![Stmt]
-  | StmtClass !UUID !Token !(Map Text StmtFunctionLit)
+  | StmtClass !UUID !Token !(Map Text StmtFunctionLit) !(Maybe ExprVar)
   deriving (Show, Eq, Ord)
 
 data StmtFunctionLit = StmtFunctionLit !UUID !Token ![Token] ![Stmt] deriving (Show, Eq, Ord)
@@ -91,7 +99,7 @@ instance Pretty [Stmt] where
       pretty' (StmtWhile _ cond body) = [i|(while #{pretty cond} #{pretty' body})|]
       pretty' (StmtFunction lit) = pretty lit
       pretty' (StmtReturn _ keyword value) = [i|(#{pretty keyword} #{maybe "nil" pretty value})|]
-      pretty' (StmtClass _ name methods) = [i|(class #{pretty name} (methods #{Text.unwords $ map pretty $ Map.elems methods}))|]
+      pretty' (StmtClass _ name methods super) = [i|(class #{pretty name} (methods #{Text.unwords $ map pretty $ Map.elems methods})#{maybe "" ((\x -> " (super " <> x <> ")") . pretty) super})|]
 
 instance Pretty StmtFunctionLit where
   pretty (StmtFunctionLit _ name params body) = [i|(declare-fun #{pretty name} #{prettyList params} #{pretty body})|]
@@ -116,8 +124,9 @@ instance HasName Expr where
   toName (ExprGrouping _ _) = ""
   toName (ExprLiteral _ _) = ""
   toName (ExprUnary _ t _) = toName t
-  toName (ExprVariable _ t) = toName t
+  toName (ExprVariable v) = toName v
   toName (ExprThis _ t) = toName t
+  toName (ExprSuper _ t _) = toName t
 
 instance HasName Stmt where
   toName (StmtExpr _ _) = ""
@@ -128,7 +137,10 @@ instance HasName Stmt where
   toName (StmtVar _ t _) = toName t
   toName (StmtWhile {}) = ""
   toName (StmtBlock _ _) = ""
-  toName (StmtClass _ t _) = toName t
+  toName (StmtClass _ t _ _) = toName t
 
 instance HasName StmtFunctionLit where
   toName (StmtFunctionLit _ t _ _) = toName t
+
+instance HasName ExprVar where
+  toName (ExprVar _ t) = toName t

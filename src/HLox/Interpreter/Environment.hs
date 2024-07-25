@@ -24,8 +24,10 @@ import Data.HashTable.IO qualified as H
 import Data.List.NonEmpty (NonEmpty ((:|)), (<|))
 import Data.List.NonEmpty qualified as NonEmpty
 import Data.Maybe (fromMaybe, isJust)
+import Data.String.Conversions (convertString)
 import Data.String.Interpolate (i)
 import Data.Text (Text)
+import GHC.IO (unsafePerformIO)
 import HLox.Interpreter.Types (Environment (..), InterpretError (..), LoxNativeFunKind (..), LoxValue (..))
 import HLox.Scanner.Types (Token)
 import Prelude hiding (lookup)
@@ -66,7 +68,7 @@ lookupAt :: (MonadIO m) => Int -> Environment -> Text -> m (Maybe LoxValue)
 lookupAt idx (Environment es) k = liftIO $ H.lookup (es NonEmpty.!! idx) k
 
 unsafeLookupAt :: (MonadIO m) => Int -> Environment -> Text -> m LoxValue
-unsafeLookupAt idx e k = fromMaybe (error "UnsafeLookupAt") <$> lookupAt idx e k
+unsafeLookupAt idx e k = fromMaybe (error [i|UnsafeLookupAt: #{idx} #{unsafeShow e} #{k}|]) <$> lookupAt idx e k
 
 globalGet :: (MonadIO m) => Environment -> Text -> m (Maybe LoxValue)
 globalGet (Environment es) k = liftIO $ H.lookup (NonEmpty.last es) k
@@ -89,3 +91,6 @@ assignGlobal (Environment es) t k v = do
     (isJust <$> liftIO (H.lookup e k))
     (liftIO $ void (liftIO (H.insert e k v)))
     (throwError $ InterpretRuntimeError t [i|Undefined global variable '#{k}'|])
+
+unsafeShow :: Environment -> Text
+unsafeShow (Environment es) = unsafePerformIO $ fmap (convertString . show) $ traverse H.toList $ NonEmpty.toList es

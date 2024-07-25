@@ -4,6 +4,7 @@ import Control.Lens.Lens ((<&>))
 import Control.Monad.Except (runExceptT)
 import Control.Monad.State (evalStateT)
 import Control.Monad.Writer (runWriterT)
+import Data.Functor (($>))
 import Data.String.Interpolate (i)
 import Data.Text (Text)
 import HLox.Interpreter (evalExpr, evalPure)
@@ -16,7 +17,6 @@ import HLox.Scanner (scanTokens)
 import HLox.Scanner.Types
 import HLox.Types
 import Test.Hspec
-import Data.Functor (($>))
 
 spec_environment :: SpecWith ()
 spec_environment = do
@@ -282,6 +282,41 @@ spec_interpreterPrograms = do
               |]
       result <- interpretStmt' program
       result `shouldBe` Right [LoxEffectPrint "Before", LoxEffectPrint "<instance Foo <HashTable>>"]
+
+    it "should allow subclassing" $ do
+      let program =
+            [i|class Doughnut {
+                  cook() {
+                    print "Fry until golden brown.";
+                  }
+                }
+
+                class BostonCream < Doughnut {}
+
+                BostonCream().cook();
+               |]
+      result <- interpretStmt' program
+      result `shouldBe` Right [LoxEffectPrint "Fry until golden brown."]
+
+    it "should allow calling super methods" $ do
+      let program =
+            [i|class Doughnut {
+                  cook() {
+                    print "Fry until golden brown.";
+                  }
+                }
+
+                class BostonCream < Doughnut {
+                  cook() {
+                    super.cook();
+                    print "Pipe full of custard and coat with chocolate.";
+                  }
+                }
+
+                BostonCream().cook();
+               |]
+      result <- interpretStmt' program
+      result `shouldBe` Right [LoxEffectPrint "Fry until golden brown.", LoxEffectPrint "Pipe full of custard and coat with chocolate."]
 
 evalExpr' :: Text -> IO (Either InterpretError LoxValue)
 evalExpr' input = do

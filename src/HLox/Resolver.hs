@@ -57,16 +57,23 @@ resolve1 (StmtReturn _ keyword expr) = do
       ((== FunctionTypeIntializer) <$> use currentFunction)
       (tell . pure $ ResolverError keyword "Can't return a value from an initializer.")
       (resolveExpr expr')
-
 resolve1 (StmtWhile _ c body) = resolveExpr c >> resolve1 body
 resolve1 (StmtBlock _ stmts) = do
   beginScope
   resolveAll stmts
   endScope
-resolve1 (StmtClass _ name methods) = do
+resolve1 (StmtClass _ name methods mSuperclass) = do
   enclosingClass <- classType <<.= ClassTypeClass
   declare name
   define name
+
+  for_ mSuperclass $ \superclass@(ExprVar _ t) -> do
+    when (toName name == toName superclass) $ tell . pure $ ResolverError t "A class can't inherit from itself."
+    resolveExpr (ExprVariable superclass)
+
+  for_ mSuperclass $ const $ do
+    beginScope
+    scopeStack . _ScopeStack . _head . at "super" ?= Initialized
 
   beginScope
   scopeStack . _ScopeStack . _head . at "this" ?= Initialized
@@ -74,6 +81,9 @@ resolve1 (StmtClass _ name methods) = do
     let ft = if toName m == "init" then FunctionTypeIntializer else FunctionTypeMethod
     resolveFunction ft m
   endScope
+
+  for_ mSuperclass $ const endScope
+
   classType .= enclosingClass
 
 resolveFunction ::
@@ -106,7 +116,7 @@ resolveExpr ::
   ) =>
   Expr ->
   m ()
-resolveExpr expr@(ExprVariable _ n) = do
+resolveExpr expr@(ExprVariable (ExprVar _ n)) = do
   scopesAreEmpty <- scopeEmpty <$> use scopeStack
   uninitialized <- (== Just Uninitialized) <$> preuse (scopeStack . _ScopeStack . _head . ix (toName n))
   if not scopesAreEmpty && uninitialized
@@ -128,6 +138,7 @@ resolveExpr (ExprSet _ obj _ v) = resolveExpr v >> resolveExpr obj
 resolveExpr expr@(ExprThis _ t) = do
   whenM ((== ClassTypeNone) <$> use classType) $ tell . pure $ ResolverError t "Can't use 'this' outside of a class."
   resolveLocal expr t
+resolveExpr expr@(ExprSuper _ kw _) = resolveLocal expr kw
 
 beginScope :: (HasScopeStack s ScopeStack, MonadState s m) => m ()
 beginScope = scopeStack . _ScopeStack %= (mempty :)

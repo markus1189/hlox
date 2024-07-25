@@ -64,10 +64,18 @@ parseDeclaration =
 parseClassDeclaration :: StateT ParseState Lox Stmt
 parseClassDeclaration = do
   name <- consume IDENTIFIER "Expect class name."
+  superclass <-
+    ifM
+      (match [LESS])
+      ( do
+          void $ consume IDENTIFIER "Expect superclass name."
+          Just <$> (ExprVar <$> freshId <*> previous)
+      )
+      (pure Nothing)
   void $ consume LEFT_BRACE "Expect '{' before class body."
   methods <- whileM ((&&) <$> (not <$> check RIGHT_BRACE) <*> (not <$> isAtEnd)) (parseFunction "method")
   void $ consume RIGHT_BRACE "Expect '}' after class body."
-  StmtClass <$> freshId <*> pure name <*> pure (Map.fromList $ fmap (\f -> (toName f, f)) methods)
+  StmtClass <$> freshId <*> pure name <*> pure (Map.fromList $ fmap (\f -> (toName f, f)) methods) <*> pure superclass
 
 parseFunction :: Text -> StateT ParseState Lox StmtFunctionLit
 parseFunction kind = do
@@ -179,7 +187,7 @@ parseAssignment = do
       value <- parseAssignment
 
       case expr of
-        ExprVariable _ name -> lift $ ExprAssign <$> freshId <*> pure name <*> pure value
+        ExprVariable (ExprVar _ name) -> lift $ ExprAssign <$> freshId <*> pure name <*> pure value
         ExprGet _ obj name -> ExprSet <$> freshId <*> pure obj <*> pure name <*> pure value
         _ -> do
           lift $ void $ createError equals "Invalid assignment target."
@@ -248,10 +256,18 @@ parsePrimary = ifM (match [FALSE]) (ExprLiteral <$> freshId <*> pure (LitBool Fa
         n <- previous
         ExprLiteral <$> freshId <*> pure (n ^. literal)
     )
+  $ ifM
+    (match [SUPER])
+    ( do
+        keyword <- previous
+        void $ consume DOT "Expect '.' after 'super'."
+        method <- consume IDENTIFIER "Expect superclass method name."
+        ExprSuper <$> freshId <*> pure keyword <*> pure method
+    )
   $ ifM (match [THIS]) (ExprThis <$> freshId <*> previous)
   $ ifM
     (match [IDENTIFIER])
-    (ExprVariable <$> freshId <*> previous)
+    (ExprVariable <$> (ExprVar <$> freshId <*> previous))
   $ ifM
     (match [LEFT_PAREN])
     ( do

@@ -7,7 +7,7 @@ import Control.Lens.Operators
     (.=),
     (<<.=),
     (^.),
-    (^?),
+    (^?), (<.=),
   )
 import Control.Monad (unless, void)
 import Control.Monad.Error.Class (liftEither, tryError)
@@ -28,11 +28,13 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TIO
 import Data.Time.Clock.POSIX (getPOSIXTime)
+import Data.Traversable (for)
 import Data.UUID (UUID)
+import Debug.Trace (traceShowM)
 import HLox.Interpreter.Environment (assignAt, assignGlobal, unsafeLookupAt)
 import HLox.Interpreter.Environment qualified as Env
 import HLox.Interpreter.Types
-import HLox.Parser.Types (Expr (..), Stmt (..), StmtFunctionLit (StmtFunctionLit), exprId, toName)
+import HLox.Parser.Types (Expr (..), ExprVar (..), Stmt (..), StmtFunctionLit (StmtFunctionLit), exprId, toName)
 import HLox.Resolver.Types
 import HLox.Scanner.Types
 import HLox.Types (Lox)
@@ -72,33 +74,38 @@ evalPure = traverse_ executePure
     executePure (StmtPrint _ e) = do
       x <- interpret e
       tell [LoxEffectPrint $ stringify x]
-    executePure (StmtVar _ name Nothing) = do
-      env <- use environment
-      Env.define env (toName name) LoxNil
+    executePure (StmtVar _ name Nothing) = defineEnv (toName name) LoxNil
     executePure (StmtVar _ name (Just initializer)) = do
       v <- interpret initializer
-      env <- use environment
-      Env.define env (toName name) v
+      defineEnv (toName name) v
     executePure (StmtBlock _ stmts') = do
-      env <- use environment >>= Env.pushEmpty
-      environment .= env
+      void pushEmptyEnv
       traverse_ executePure stmts'
-      environment %= Env.pop
-      pure ()
+      popEnv
     executePure (StmtWhile _ cond body) = whileM_ (isTruthy <$> interpret cond) (executePure body)
     executePure (StmtFunction (StmtFunctionLit _ name params body)) = do
       env <- use environment
       let f = LoxFun (LoxFunction (map toName params) env body LoxFunctionTypeRegular)
-      Env.define env (toName name) f
+      defineEnv (toName name) f
     executePure (StmtReturn _ _ value) = do
       r <- case value of
         Just v -> interpret v
         Nothing -> pure LoxNil
       throwError (InterpretReturn r)
-    executePure (StmtClass _ name ms) = do
-      env <- use environment
+    executePure (StmtClass _ name ms mSuperclass) = do
+      mSuperKlass <- for mSuperclass $ \superclass@(ExprVar _ t) -> do
+        sc <- interpret (ExprVariable superclass)
+        case sc of
+          LoxClass k -> pure k
+          _ -> throwError $ InterpretRuntimeError t "Superclass must be a class."
       let name' = toName name
-      Env.define env name' LoxNil
+      defineEnv name' LoxNil
+
+      for_ mSuperKlass $ \superklass -> do
+        void pushEmptyEnv
+        defineEnv "super" (LoxClass superklass)
+
+      env <- use environment
       let klass =
             LoxClass
               ( Klass
@@ -118,8 +125,30 @@ evalPure = traverse_ executePure
                     )
                       ms
                   )
+                  mSuperKlass
               )
-      Env.assign env name name' klass
+
+      for_ mSuperKlass $ const $ popEnv
+      assignEnv name klass
+
+assignEnv :: (MonadState s m, HasEnvironment s Environment,  MonadError InterpretError m, MonadIO m) => Token -> LoxValue -> m ()
+assignEnv name  v = do
+  env <- use environment
+  Env.assign env name (toName name) v
+
+defineEnv :: (MonadIO m, HasEnvironment s Environment, MonadState s m) => Text -> LoxValue -> m ()
+defineEnv name v = do
+  env <- use environment
+  Env.define env name v
+
+pushEmptyEnv :: (MonadIO m, HasEnvironment s Environment, MonadState s m) => m Environment
+pushEmptyEnv = do
+  env <- use environment
+  env' <- Env.pushEmpty env
+  environment <.= env'
+
+popEnv :: (HasEnvironment s Environment, MonadState s m) => m ()
+popEnv = environment %= Env.pop
 
 runEffect :: LoxEffect -> IO ()
 runEffect (LoxEffectPrint t) = TIO.putStrLn t
@@ -187,7 +216,7 @@ interpret (ExprAssign eid name value) = do
     Nothing -> assignGlobal env name (toName name) v
   pure v
 --
-interpret (ExprVariable eid name) = lookupVariable name eid
+interpret (ExprVariable (ExprVar eid name)) = lookupVariable (toName name) eid
 --
 interpret (ExprLogical _ lhs op rhs) = do
   left <- interpret lhs
@@ -201,11 +230,13 @@ interpret (ExprCall _ callee paren arguments) = do
   checkArity paren (length args) callee'
   let function = callee'
   call paren function args
+--
 interpret (ExprGet _ object name) = do
   obj <- interpret object
   case obj of
     (LoxInst inst) -> instanceGet name inst
     _ -> throwError $ InterpretRuntimeError name "Only instances have properties."
+--
 interpret (ExprSet _ object name value) = do
   obj <- interpret object
   case obj of
@@ -214,7 +245,22 @@ interpret (ExprSet _ object name value) = do
       instanceSet name v fs
       pure v
     _ -> throwError $ InterpretRuntimeError name "Only instances have fields."
-interpret expr@(ExprThis _ n) = lookupVariable n (expr ^. exprId)
+--
+interpret expr@(ExprThis _ n) = lookupVariable (toName n) (expr ^. exprId)
+--
+interpret expr@(ExprSuper eid kw name) = do
+  superklass <- lookupVariable "super" eid
+  case superklass of
+    LoxClass superklass' -> do
+      object <- lookupVariableDepthModifier (subtract 1) "this" eid
+      let method = lookupMethod (toName name) superklass'
+      case method of
+        Nothing -> throwError $ InterpretRuntimeError name [i|Method ${toName name} was not found in super.|]
+        Just mthd -> do
+          case object of
+            LoxInst this -> LoxFun <$> functionBind mthd this
+            _ -> throwError $ InterpretRuntimeError name [i|'This' did not resolve to an instance of a class.|]
+    _ -> throwError $ InterpretRuntimeError kw "Super did not resolve to a class."
 
 {-
 ---------------------------------------------------------------------------------------------------
@@ -247,18 +293,30 @@ lookupVariable ::
     HasEnvironment s Environment,
     MonadState s m
   ) =>
-  Token ->
+  Text ->
   UUID ->
   m LoxValue
-lookupVariable name eid = do
+lookupVariable = lookupVariableDepthModifier id
+
+lookupVariableDepthModifier ::
+  ( MonadIO m,
+    HasDepthMap s DepthMap,
+    HasEnvironment s Environment,
+    MonadState s m
+  ) =>
+  (Int -> Int) ->
+  Text ->
+  UUID ->
+  m LoxValue
+lookupVariableDepthModifier f name eid = do
   mDistance <- use (depthMap . _DepthMap . at eid)
-  case mDistance of
+  case f <$> mDistance of
     Just distance -> do
       env <- use environment
-      Env.unsafeLookupAt distance env (toName name)
+      Env.unsafeLookupAt distance env name
     Nothing -> do
       env <- use environment
-      Env.unsafeGlobalGet env (toName name)
+      Env.unsafeGlobalGet env name
 
 call ::
   ( MonadIO m,
@@ -288,7 +346,7 @@ call _ (LoxFun (LoxFunction params funEnv body typ)) args = do
   case typ of
     LoxFunctionTypeInitializer -> unsafeLookupAt 0 funEnv "this"
     LoxFunctionTypeRegular -> pure (fromMaybe LoxNil r')
-call paren (LoxClass k@(Klass _ (KlassMethods kms))) args = do
+call paren (LoxClass k@(Klass _ (KlassMethods kms) _)) args = do
   inst <- LoxInstance k <$> liftIO (InstanceFields <$> H.new)
   let initializer = Map.lookup "init" kms
   for_ initializer $ \f -> do
@@ -314,4 +372,4 @@ isTruthy (LoxBool b) = b
 isTruthy _ = True
 
 lookupMethod :: Text -> Klass -> Maybe LoxFunction
-lookupMethod n (Klass _ (KlassMethods m)) = Map.lookup n m
+lookupMethod n (Klass _ (KlassMethods m) super) = Map.lookup n m <|> (super >>= lookupMethod n)
