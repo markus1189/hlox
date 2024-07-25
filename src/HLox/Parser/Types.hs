@@ -24,6 +24,7 @@ data Expr
   | ExprLiteral !UUID !Literal
   | ExprUnary !UUID !Token !Expr
   | ExprVariable !UUID !Token
+  | ExprThis !UUID !Token
   deriving (Show, Eq, Ord)
 
 exprId :: Lens' Expr UUID
@@ -37,6 +38,7 @@ exprId f (ExprGrouping uid e) = fmap (`ExprGrouping` e) (f uid)
 exprId f (ExprLiteral uid lit) = fmap (`ExprLiteral` lit) (f uid)
 exprId f (ExprUnary uid op e) = fmap (\uid' -> ExprUnary uid' op e) (f uid)
 exprId f (ExprVariable uid t) = fmap (`ExprVariable` t) (f uid)
+exprId f (ExprThis uid t) = fmap (`ExprThis` t) (f uid)
 
 instance Pretty Expr where
   pretty :: Expr -> Text
@@ -53,6 +55,7 @@ instance Pretty Expr where
   pretty (ExprCall _ callee _ arguments) = [i|(call #{pretty callee} #{prettyList arguments})|]
   pretty (ExprGet _ object name) = [i|(get #{pretty object} #{pretty name})|]
   pretty (ExprSet _ object name value) = [i|(set #{pretty object} #{pretty name} #{pretty value})|]
+  pretty (ExprThis _ _) = "this"
 
 prettyList :: (Pretty a) => [a] -> Text
 prettyList [] = "()"
@@ -113,6 +116,7 @@ instance HasName Expr where
   toName (ExprLiteral _ _) = ""
   toName (ExprUnary _ t _) = toName t
   toName (ExprVariable _ t) = toName t
+  toName (ExprThis _ t) = toName t
 
 instance HasName Stmt where
   toName (StmtExpr _ _) = ""

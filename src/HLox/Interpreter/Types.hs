@@ -26,10 +26,12 @@ data LoxValue
   | LoxFun !LoxFunction
   | LoxNativeFun !LoxNativeFunKind
   | LoxClass !Klass
-  | LoxInstance !Klass !InstanceFields
+  | LoxInst !LoxInstance
   deriving (Show, Eq, Ord)
 
 data LoxFunction = LoxFunction ![Text] !Environment ![Stmt] deriving (Show, Eq, Ord)
+
+data LoxInstance = LoxInstance  !Klass !InstanceFields deriving (Show, Eq, Ord)
 
 data Klass = Klass !Text !KlassMethods deriving (Show, Eq, Ord)
 
@@ -55,7 +57,7 @@ stringify (LoxBool False) = "false"
 stringify (LoxFun {}) = "<function>"
 stringify (LoxNativeFun k) = [i|<native function: #{show k}>|]
 stringify (LoxClass (Klass n _)) = [i|<class #{n}>|]
-stringify (LoxInstance (Klass n _) (InstanceFields fields)) = [i|<instance #{n} #{fields}>|]
+stringify (LoxInst (LoxInstance (Klass n _) (InstanceFields fields))) = [i|<instance #{n} #{fields}>|]
 
 data InterpretError
   = InterpretRuntimeError !Token !Text

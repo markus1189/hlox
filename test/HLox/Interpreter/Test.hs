@@ -252,6 +252,19 @@ spec_interpreterPrograms = do
       result <- interpretStmt' program
       result `shouldBe` Right [LoxEffectPrint "Crunch crunch crunch!"]
 
+    it "should bind this" $ do
+      let program = [i|class Cake {
+                         taste() {
+                           var adjective = "delicious";
+                           print "The " + this.flavor + " cake is " + adjective + "!";
+                         }
+                       }
+                       var cake = Cake();
+                       cake.flavor = "German chocolate";
+                       cake.taste();
+                      |]
+      result <- interpretStmt' program
+      result `shouldBe` Right [LoxEffectPrint "The German chocolate cake is delicious!"]
 
 evalExpr' :: Text -> IO (Either InterpretError LoxValue)
 evalExpr' input = do

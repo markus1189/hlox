@@ -1,7 +1,7 @@
 module HLox.Interpreter (eval, evalPure, evalExpr) where
 
 import Control.Applicative ((<|>))
-import Control.Lens.Combinators (at, to, use, view)
+import Control.Lens.Combinators (at, to, use)
 import Control.Lens.Operators
   ( (%=),
     (.=),
@@ -30,7 +30,7 @@ import Data.UUID (UUID)
 import HLox.Interpreter.Environment (assignAt, assignGlobal)
 import HLox.Interpreter.Environment qualified as Env
 import HLox.Interpreter.Types
-import HLox.Parser.Types (Expr (..), Stmt (..), StmtFunctionLit (StmtFunctionLit), toName)
+import HLox.Parser.Types (Expr (..), Stmt (..), StmtFunctionLit (StmtFunctionLit), toName, exprId)
 import HLox.Resolver.Types
 import HLox.Scanner.Types
 import HLox.Types (Lox)
@@ -196,29 +196,39 @@ interpret (ExprCall _ callee paren arguments) = do
 interpret (ExprGet _ object name) = do
   obj <- interpret object
   case obj of
-    LoxInstance (Klass _ kms) fs -> instanceGet name fs kms
+    (LoxInst inst) -> instanceGet name inst
     _ -> throwError $ InterpretRuntimeError name "Only instances have properties."
 interpret (ExprSet _ object name value) = do
   obj <- interpret object
   case obj of
-    LoxInstance _ fs -> do
+    LoxInst (LoxInstance _ fs) -> do
       v <- interpret value
       instanceSet name v fs
       pure v
     _ -> throwError $ InterpretRuntimeError name "Only instances have fields."
+interpret expr@(ExprThis _ n) = lookupVariable n (expr ^. exprId)
+
+{-
+---------------------------------------------------------------------------------------------------
+-}
 
 instanceSet :: (MonadIO m) => Token -> LoxValue -> InstanceFields -> m ()
 instanceSet (toName -> name) v (InstanceFields fields) = do
   liftIO $ H.insert fields name v
 
-instanceGet :: (MonadError InterpretError m, MonadIO m) => Token -> InstanceFields -> KlassMethods -> m LoxValue
-instanceGet name (InstanceFields fields) (KlassMethods ms) = do
-  let name' = toName name
-  fld <- liftIO $ H.lookup fields name'
-  let mtd = LoxFun <$> Map.lookup (toName name) ms
-  case fld <|> mtd of
-    Nothing -> throwError $ InterpretRuntimeError name [i|Undefined property '#{name'}'.|]
+instanceGet :: (MonadError InterpretError m, MonadIO m) => Token -> LoxInstance -> m LoxValue
+instanceGet name inst@(LoxInstance (Klass _  (KlassMethods ms)) (InstanceFields fields)) = do
+  fld <- liftIO $ H.lookup fields (toName name)
+  let mtd = Map.lookup (toName name) ms
+  case fld of
     Just x -> pure x
+    Nothing ->
+      case mtd of
+        Nothing -> throwError $ InterpretRuntimeError name [i|Undefined property '#{toName name}'.|]
+        Just (LoxFunction n funEnv body) -> do
+          callEnv <- Env.pushEmpty funEnv
+          Env.define callEnv "this" (LoxInst inst)
+          pure (LoxFun $ LoxFunction n callEnv body)
 
 lookupVariable ::
   ( MonadIO m,
@@ -262,7 +272,7 @@ call _ (LoxFun (LoxFunction params funEnv body)) args = do
     Right _ -> pure Nothing
   environment .= oldEnv
   pure (fromMaybe LoxNil r')
-call _ (LoxClass k) _ = LoxInstance k <$> liftIO (InstanceFields <$> H.new)
+call _ (LoxClass k) _ = LoxInst <$> (LoxInstance k <$> liftIO (InstanceFields <$> H.new))
 call _ (LoxNativeFun LoxClock) _ = LoxNumber . realToFrac <$> liftIO getPOSIXTime
 call paren _ _ = throwError (InterpretRuntimeError paren "Can only call functions and classes.")
 

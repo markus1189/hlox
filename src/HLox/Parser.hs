@@ -13,6 +13,7 @@ import Control.Monad.Loops (iterateM_, unfoldrM, untilM, whileM, whileM_)
 import Control.Monad.Reader (lift)
 import Control.Monad.State (MonadState, StateT (runStateT))
 import Data.Either.Extra (fromEither)
+import Data.Map.Strict qualified as Map
 import Data.Maybe (catMaybes, fromMaybe, isJust)
 import Data.String.Interpolate (i)
 import Data.Text (Text)
@@ -24,7 +25,6 @@ import HLox.Pretty (Pretty, pretty)
 import HLox.Scanner.Types
 import HLox.Types (Lox, MonadFreshId, freshId)
 import HLox.Util (loxReport)
-import qualified Data.Map.Strict as Map
 
 data ParseState where
   ParseState ::
@@ -248,6 +248,7 @@ parsePrimary = ifM (match [FALSE]) (ExprLiteral <$> freshId <*> pure (LitBool Fa
         n <- previous
         ExprLiteral <$> freshId <*> pure (n ^. literal)
     )
+  $ ifM (match [THIS]) (ExprThis <$> freshId <*> previous)
   $ ifM
     (match [IDENTIFIER])
     (ExprVariable <$> freshId <*> previous)

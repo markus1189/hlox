@@ -60,7 +60,11 @@ resolve1 (StmtBlock _ stmts) = do
 resolve1 (StmtClass _ name methods) = do
   declare name
   define name
+
+  beginScope
+  scopeStack . _ScopeStack . _head . at "this" ?= Initialized
   for_ methods $ resolveFunction FunctionTypeMethod
+  endScope
 
 resolveFunction ::
   ( HasCurrentFunction s FunctionType,
@@ -109,6 +113,7 @@ resolveExpr (ExprLogical _ lhs _ rhs) = resolveExpr lhs *> resolveExpr rhs
 resolveExpr (ExprUnary _ _ expr) = resolveExpr expr
 resolveExpr (ExprGet _ expr _) = resolveExpr expr
 resolveExpr (ExprSet _ obj _ v) = resolveExpr v >> resolveExpr obj
+resolveExpr expr@(ExprThis _ t) = resolveLocal expr t
 
 beginScope :: (HasScopeStack s ScopeStack, MonadState s m) => m ()
 beginScope = scopeStack . _ScopeStack %= (mempty :)
