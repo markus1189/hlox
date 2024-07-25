@@ -28,6 +28,9 @@ spec_simpleAst = do
     it "should detect usage of 'this' outside a class" $ do
       result <- resolve' [i|{ print this; }|]
       result `shouldBe` (DepthMap mempty, [ResolverError (Token THIS (Lexeme "this") LitNothing (Line 1)) "Can't use 'this' outside of a class."])
+    it "should disallow returning a value from initializer" $ do
+      result <- resolve' [i|class Foo { init() { return 42; } }|]
+      result `shouldBe` (DepthMap mempty, [ResolverError (Token RETURN (Lexeme "return") LitNothing (Line 1)) "Can't return a value from an initializer."])
 
 resolve' :: Text -> IO (DepthMap, [ResolverError])
 resolve' input = do

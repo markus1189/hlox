@@ -1,11 +1,9 @@
-{-# OPTIONS_GHC -Wno-deferred-out-of-scope-variables #-}
-
 module HLox.Interpreter.Test where
 
 import Control.Lens.Lens ((<&>))
 import Control.Monad.Except (runExceptT)
 import Control.Monad.State (evalStateT)
-import Control.Monad.Writer (execWriterT)
+import Control.Monad.Writer (runWriterT)
 import Data.String.Interpolate (i)
 import Data.Text (Text)
 import HLox.Interpreter (evalExpr, evalPure)
@@ -17,7 +15,8 @@ import HLox.Resolver.Types (DepthMap (..))
 import HLox.Scanner (scanTokens)
 import HLox.Scanner.Types
 import HLox.Types
-import Test.Hspec (SpecWith, describe, it, shouldBe)
+import Test.Hspec
+import Data.Functor (($>))
 
 spec_environment :: SpecWith ()
 spec_environment = do
@@ -257,17 +256,32 @@ spec_interpreterPrograms = do
     it "should bind this" $ do
       let program =
             [i|class Cake {
-                         taste() {
-                           var adjective = "delicious";
-                           print "The " + this.flavor + " cake is " + adjective + "!";
-                         }
-                       }
-                       var cake = Cake();
-                       cake.flavor = "German chocolate";
-                       cake.taste();
-                      |]
+                 taste() {
+                   var adjective = "delicious";
+                   print "The " + this.flavor + " cake is " + adjective + "!";
+                 }
+               }
+               var cake = Cake();
+               cake.flavor = "German chocolate";
+               cake.taste();
+              |]
       result <- interpretStmt' program
       result `shouldBe` Right [LoxEffectPrint "The German chocolate cake is delicious!"]
+
+    it "should allow early returns in class initializer" $ do
+      let program =
+            [i|class Foo {
+                 init() {
+                   print "Before";
+                   return;
+                   print "After";
+                 }
+               }
+
+               print Foo();
+              |]
+      result <- interpretStmt' program
+      result `shouldBe` Right [LoxEffectPrint "Before", LoxEffectPrint "<instance Foo <HashTable>>"]
 
 evalExpr' :: Text -> IO (Either InterpretError LoxValue)
 evalExpr' input = do
@@ -284,4 +298,5 @@ interpretStmt' input = do
   let (tokens, _) = scanTokens input
   Right result <- flip runLox loxEnv $ parse tokens
   let (dm, []) = resolve result
-  runExceptT . execWriterT $ evalStateT (evalPure result) (InterpreterState env dm)
+  (e, effs) <- runWriterT $ runExceptT $ evalStateT (evalPure result) (InterpreterState env dm)
+  pure $ e $> effs

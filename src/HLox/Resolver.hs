@@ -11,7 +11,7 @@ import Control.Lens.Combinators
   )
 import Control.Lens.Operators ((%=), (.=), (<<.=), (?=), (^.))
 import Control.Monad (when)
-import Control.Monad.Extra (whenM)
+import Control.Monad.Extra (ifM, whenM)
 import Control.Monad.RWS.Strict (runRWS)
 import Control.Monad.State.Class (MonadState)
 import Control.Monad.Writer.Class (MonadWriter, tell)
@@ -52,7 +52,12 @@ resolve1 (StmtPrint _ expr) = resolveExpr expr
 resolve1 (StmtReturn _ keyword expr) = do
   curFunc <- use currentFunction
   when (curFunc == FunctionTypeNone) . tell . pure $ ResolverError keyword "Can't return from top-level code."
-  traverse_ resolveExpr expr
+  for_ expr $ \expr' -> do
+    ifM
+      ((== FunctionTypeIntializer) <$> use currentFunction)
+      (tell . pure $ ResolverError keyword "Can't return a value from an initializer.")
+      (resolveExpr expr')
+
 resolve1 (StmtWhile _ c body) = resolveExpr c >> resolve1 body
 resolve1 (StmtBlock _ stmts) = do
   beginScope
@@ -65,7 +70,9 @@ resolve1 (StmtClass _ name methods) = do
 
   beginScope
   scopeStack . _ScopeStack . _head . at "this" ?= Initialized
-  for_ methods $ resolveFunction FunctionTypeMethod
+  for_ methods $ \m -> do
+    let ft = if toName m == "init" then FunctionTypeIntializer else FunctionTypeMethod
+    resolveFunction ft m
   endScope
   classType .= enclosingClass
 

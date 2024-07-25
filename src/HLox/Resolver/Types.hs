@@ -18,6 +18,7 @@ data FunctionType
   = FunctionTypeNone
   | FunctionTypeFunction
   | FunctionTypeMethod
+  | FunctionTypeIntializer
   deriving (Show, Eq, Ord)
 
 data ClassType = ClassTypeNone | ClassTypeClass deriving (Show, Eq, Ord)

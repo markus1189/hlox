@@ -29,7 +29,9 @@ data LoxValue
   | LoxInst !LoxInstance
   deriving (Show, Eq, Ord)
 
-data LoxFunction = LoxFunction ![Text] !Environment ![Stmt] deriving (Show, Eq, Ord)
+data LoxFunctionType = LoxFunctionTypeRegular | LoxFunctionTypeInitializer deriving (Show, Eq, Ord)
+
+data LoxFunction = LoxFunction ![Text] !Environment ![Stmt] !LoxFunctionType deriving (Show, Eq, Ord)
 
 data LoxInstance = LoxInstance !Klass !InstanceFields deriving (Show, Eq, Ord)
 
