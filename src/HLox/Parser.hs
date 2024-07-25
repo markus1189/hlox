@@ -51,7 +51,7 @@ parseDeclaration =
       <$> ( ifM (match [CLASS]) parseClassDeclaration
               $ ifM
                 (match [FUN])
-                (parseFunction "function")
+                (StmtFunction <$> parseFunction "function")
               $ ifM
                 (match [VAR])
                 parseVarDeclaration
@@ -68,7 +68,7 @@ parseClassDeclaration = do
   void $ consume RIGHT_BRACE "Expect '}' after class body."
   StmtClass <$> freshId <*> pure name <*> pure methods
 
-parseFunction :: Text -> StateT ParseState Lox Stmt
+parseFunction :: Text -> StateT ParseState Lox StmtFunctionLit
 parseFunction kind = do
   name <- consume IDENTIFIER [i|Expect #{kind} name.|]
   void $ consume LEFT_PAREN [i|Expect '(' after #{kind} name.|]
@@ -79,7 +79,7 @@ parseFunction kind = do
     void . lift $ createError t "Can't have more than 255 arguments."
   void $ consume RIGHT_PAREN "Expect ')' after parameters."
   void $ consume LEFT_BRACE [i|Expect '{' before #{kind} body.|]
-  StmtFunction <$> freshId <*> pure name <*> pure parameters <*> parseBlock
+  (StmtFunctionLit <$> freshId <*> pure name <*> pure parameters <*> parseBlock)
 
 parseVarDeclaration :: StateT ParseState Lox Stmt
 parseVarDeclaration = do

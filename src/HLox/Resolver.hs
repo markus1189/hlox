@@ -38,10 +38,10 @@ resolve1 (StmtVar _ n initializer) = do
   declare n
   traverse_ resolveExpr initializer
   define n
-resolve1 (StmtFunction _ name ps body) = do
+resolve1 (StmtFunction f@(StmtFunctionLit _ name _ _)) = do
   declare name
   define name
-  resolveFunction ps body
+  resolveFunction FunctionTypeFunction f
 resolve1 (StmtExpr _ expr) = resolveExpr expr
 resolve1 (StmtIf _ cond ifTrue ifFalse) = do
   resolveExpr cond
@@ -57,11 +57,23 @@ resolve1 (StmtBlock _ stmts) = do
   beginScope
   resolveAll stmts
   endScope
-resolve1 (StmtClass _ name _) = declare name >> define name
+resolve1 (StmtClass _ name methods) = do
+  declare name
+  define name
+  for_ methods $ resolveFunction FunctionTypeMethod
 
-resolveFunction :: (HasCurrentFunction s FunctionType, HasDepthMap s DepthMap, HasScopeStack s ScopeStack, MonadWriter [ResolverError] m, MonadState s m) => [Token] -> [Stmt] -> m ()
-resolveFunction params body = do
-  enclosingFunction <- currentFunction <<.= FunctionTypeFunction
+resolveFunction ::
+  ( HasCurrentFunction s FunctionType,
+    HasDepthMap s DepthMap,
+    HasScopeStack s ScopeStack,
+    MonadWriter [ResolverError] m,
+    MonadState s m
+  ) =>
+  FunctionType ->
+  StmtFunctionLit ->
+  m ()
+resolveFunction ft (StmtFunctionLit _ _ params body) = do
+  enclosingFunction <- currentFunction <<.= ft
   beginScope
   for_ params $ \param -> do
     declare param
@@ -70,7 +82,14 @@ resolveFunction params body = do
   endScope
   currentFunction .= enclosingFunction
 
-resolveExpr :: (HasDepthMap s DepthMap, HasScopeStack s ScopeStack, MonadWriter [ResolverError] m, MonadState s m) => Expr -> m ()
+resolveExpr ::
+  ( HasDepthMap s DepthMap,
+    HasScopeStack s ScopeStack,
+    MonadWriter [ResolverError] m,
+    MonadState s m
+  ) =>
+  Expr ->
+  m ()
 resolveExpr expr@(ExprVariable _ n) = do
   scopesAreEmpty <- scopeEmpty <$> use scopeStack
   uninitialized <- (== Just Uninitialized) <$> preuse (scopeStack . _ScopeStack . _head . ix n')

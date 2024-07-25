@@ -58,15 +58,17 @@ prettyList xs = [i|(list #{Text.unwords $ map pretty xs})|]
 
 data Stmt
   = StmtExpr !UUID !Expr
-  | StmtFunction !UUID !Token ![Token] ![Stmt]
+  | StmtFunction !StmtFunctionLit
   | StmtIf !UUID !Expr !Stmt !(Maybe Stmt)
   | StmtPrint !UUID !Expr
   | StmtReturn !UUID !Token !(Maybe Expr)
   | StmtVar !UUID !Token !(Maybe Expr)
   | StmtWhile !UUID !Expr !Stmt
   | StmtBlock !UUID ![Stmt]
-  | StmtClass !UUID !Token ![Stmt]
+  | StmtClass !UUID !Token ![StmtFunctionLit]
   deriving (Show, Eq, Ord)
+
+data StmtFunctionLit = StmtFunctionLit !UUID !Token ![Token] ![Stmt] deriving (Show, Eq, Ord)
 
 data ClassMethod = ClassMethod !UUID !Token ![Token] ![Stmt] deriving (Show, Eq, Ord)
 instance Pretty ClassMethod where
@@ -81,9 +83,12 @@ instance Pretty [Stmt] where
       pretty' (StmtBlock _ stmts') = [i|(block #{Text.unwords $ map pretty' stmts'})|]
       pretty' (StmtIf _ cond ifTrue ifFalse) = [i|(if #{pretty cond} #{pretty' ifTrue} #{maybe "" pretty' ifFalse})|]
       pretty' (StmtWhile _ cond body) = [i|(while #{pretty cond} #{pretty' body})|]
-      pretty' (StmtFunction _ name params body) = [i|(declare-fun #{pretty name} #{prettyList params} #{pretty body})|]
+      pretty' (StmtFunction lit) = pretty lit
       pretty' (StmtReturn _ keyword value) = [i|(#{pretty keyword} #{maybe "nil" pretty value})|]
-      pretty' (StmtClass _ name methods) = [i|(class #{pretty name} (methods #{Text.unwords $ map pretty' methods}))|]
+      pretty' (StmtClass _ name methods) = [i|(class #{pretty name} (methods #{Text.unwords $ map pretty methods}))|]
+
+instance Pretty StmtFunctionLit where
+  pretty (StmtFunctionLit _ name params body) = [i|(declare-fun #{pretty name} #{prettyList params} #{pretty body})|]
 
 data ParseError = ParseError !Token !Text deriving (Show, Eq)
 

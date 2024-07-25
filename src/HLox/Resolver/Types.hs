@@ -17,6 +17,7 @@ data ResolverError = ResolverError !Token !Text deriving (Show, Eq)
 data FunctionType
   = FunctionTypeNone
   | FunctionTypeFunction
+  | FunctionTypeMethod
   deriving (Show, Eq, Ord)
 
 data ResolverState = ResolverState

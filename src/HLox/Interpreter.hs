@@ -30,14 +30,11 @@ import Data.UUID (UUID)
 import HLox.Interpreter.Environment (assignAt, assignGlobal)
 import HLox.Interpreter.Environment qualified as Env
 import HLox.Interpreter.Types
-import HLox.Parser.Types (Expr (..), Stmt (..))
+import HLox.Parser.Types (Expr (..), Stmt (..), StmtFunctionLit (StmtFunctionLit))
 import HLox.Resolver.Types
 import HLox.Scanner.Types
 import HLox.Types (Lox)
 import HLox.Util (loxRuntimeError)
-import qualified Data.Map.Strict as Map
-import Data.Map.Strict (Map)
-import Data.Text (Text)
 
 eval :: (Traversable t) => DepthMap -> Environment -> t Stmt -> Lox ()
 eval dm env stmts = do
@@ -89,7 +86,7 @@ evalPure = traverse_ executePure
       environment %= Env.pop
       pure ()
     executePure (StmtWhile _ cond body) = whileM_ (isTruthy <$> interpret cond) (executePure body)
-    executePure (StmtFunction _ name params body) = do
+    executePure (StmtFunction (StmtFunctionLit _ name params body)) = do
       env <- use environment
       let f = LoxFun (map (view (lexeme . _Lexeme)) params) env body
           name' = view (lexeme . _Lexeme) name
