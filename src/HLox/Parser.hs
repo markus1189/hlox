@@ -67,7 +67,7 @@ parseClassDeclaration = do
   void $ consume LEFT_BRACE "Expect '{' before class body."
   methods <- whileM ((&&) <$> (not <$> check RIGHT_BRACE) <*> (not <$> isAtEnd)) (parseFunction "method")
   void $ consume RIGHT_BRACE "Expect '}' after class body."
-  StmtClass <$> freshId <*> pure name <*> pure (Map.fromList $ fmap (\f@(StmtFunctionLit _ n _ _) -> (view (lexeme . _Lexeme) n, f)) methods)
+  StmtClass <$> freshId <*> pure name <*> pure (Map.fromList $ fmap (\f -> (toName f, f)) methods)
 
 parseFunction :: Text -> StateT ParseState Lox StmtFunctionLit
 parseFunction kind = do
@@ -318,7 +318,7 @@ createError :: Token -> Text -> Lox ParseError
 createError token msg = do
   if token ^. tokenType == EOF
     then loxReport (token ^. line) " at end" msg
-    else loxReport (token ^. line) [i| at '#{token ^. lexeme}'|] msg
+    else loxReport (token ^. line) [i| at '#{toName token}'|] msg
   pure $ ParseError token msg
 
 synchronize :: StateT ParseState Lox ()

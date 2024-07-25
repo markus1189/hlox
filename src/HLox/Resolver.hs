@@ -92,12 +92,10 @@ resolveExpr ::
   m ()
 resolveExpr expr@(ExprVariable _ n) = do
   scopesAreEmpty <- scopeEmpty <$> use scopeStack
-  uninitialized <- (== Just Uninitialized) <$> preuse (scopeStack . _ScopeStack . _head . ix n')
+  uninitialized <- (== Just Uninitialized) <$> preuse (scopeStack . _ScopeStack . _head . ix (toName n))
   if not scopesAreEmpty && uninitialized
     then tell [ResolverError n "Cannot read local variable in its own initializer"]
     else resolveLocal expr n
-  where
-    n' = view (lexeme . _Lexeme) n
 resolveExpr expr@(ExprAssign _ name value) = do
   resolveExpr value
   resolveLocal expr name
@@ -123,13 +121,13 @@ endScope =
 
 declare :: (MonadWriter [ResolverError] m, HasScopeStack s ScopeStack, MonadState s m) => Token -> m ()
 declare n = do
-  let n' = n ^. lexeme . _Lexeme
+  let n' = toName n
   scope <- use $ scopeStack . _ScopeStack . _head
   when (Map.member n' scope) . tell . pure $ ResolverError n "Already a variable with this name in this scope."
   scopeStack . _ScopeStack . _head . at n' ?= Uninitialized
 
 define :: (HasScopeStack s ScopeStack, MonadState s m) => Token -> m ()
-define n = scopeStack . _ScopeStack . _head . at (n ^. lexeme . _Lexeme) ?= Initialized
+define n = scopeStack . _ScopeStack . _head . at (toName n) ?= Initialized
 
 resolveLocal :: (HasDepthMap s DepthMap, HasScopeStack s ScopeStack, MonadWriter [ResolverError] m, MonadState s m) => Expr -> Token -> m ()
 resolveLocal expr name = do
@@ -137,4 +135,4 @@ resolveLocal expr name = do
   for_ maybeDepth $ \idx -> depthMap . _DepthMap %= Map.insert (expr ^. exprId) idx
 
 findDepth :: Token -> ScopeStack -> Maybe Int
-findDepth (view (lexeme . _Lexeme) -> name) (ScopeStack ss) = (\idx -> length ss - 1 - idx) <$> findIndex (Map.member name) (reverse ss)
+findDepth (toName -> name) (ScopeStack ss) = (\idx -> length ss - 1 - idx) <$> findIndex (Map.member name) (reverse ss)

@@ -30,7 +30,7 @@ import Data.UUID (UUID)
 import HLox.Interpreter.Environment (assignAt, assignGlobal)
 import HLox.Interpreter.Environment qualified as Env
 import HLox.Interpreter.Types
-import HLox.Parser.Types (Expr (..), Stmt (..), StmtFunctionLit (StmtFunctionLit))
+import HLox.Parser.Types (Expr (..), Stmt (..), StmtFunctionLit (StmtFunctionLit), toName)
 import HLox.Resolver.Types
 import HLox.Scanner.Types
 import HLox.Types (Lox)
@@ -71,14 +71,12 @@ evalPure = traverse_ executePure
       x <- interpret e
       tell [LoxEffectPrint $ stringify x]
     executePure (StmtVar _ name Nothing) = do
-      let name' = name ^. lexeme . _Lexeme
       env <- use environment
-      Env.define env name' LoxNil
+      Env.define env (toName name) LoxNil
     executePure (StmtVar _ name (Just initializer)) = do
       v <- interpret initializer
-      let name' = name ^. lexeme . _Lexeme
       env <- use environment
-      Env.define env name' v
+      Env.define env (toName name) v
     executePure (StmtBlock _ stmts') = do
       env <- use environment >>= Env.pushEmpty
       environment .= env
@@ -88,9 +86,8 @@ evalPure = traverse_ executePure
     executePure (StmtWhile _ cond body) = whileM_ (isTruthy <$> interpret cond) (executePure body)
     executePure (StmtFunction (StmtFunctionLit _ name params body)) = do
       env <- use environment
-      let f = LoxFun (map (view (lexeme . _Lexeme)) params) env body
-          name' = view (lexeme . _Lexeme) name
-      Env.define env name' f
+      let f = LoxFun (map toName params) env body
+      Env.define env (toName name) f
     executePure (StmtReturn _ _ value) = do
       r <- case value of
         Just v -> interpret v
@@ -98,7 +95,7 @@ evalPure = traverse_ executePure
       throwError (InterpretReturn r)
     executePure (StmtClass _ name _) = do
       env <- use environment
-      let name' = name ^. lexeme . _Lexeme
+      let name' = toName name
       Env.define env name' LoxNil
       let klass = LoxClass (Klass name')
       Env.assign env name name' klass
@@ -161,13 +158,12 @@ interpret (ExprBinary _ lhs op rhs) = do
     applyBinaryBool f e1 e2 msg = liftEither $ maybeToRight (InterpretRuntimeError op msg) $ fmap LoxBool (f <$> e1 ^? _LoxNumber <*> e2 ^? _LoxNumber)
 --
 interpret (ExprAssign eid name value) = do
-  let name' = name ^. lexeme . _Lexeme
   v <- interpret value
   mDistance <- use (depthMap . _DepthMap . at eid)
   env <- use environment
   case mDistance of
-    Just distance -> assignAt distance env name name' v
-    Nothing -> assignGlobal env name name' v
+    Just distance -> assignAt distance env name (toName name) v
+    Nothing -> assignGlobal env name (toName name) v
   pure v
 --
 interpret (ExprVariable eid name) = lookupVariable name eid
@@ -199,12 +195,12 @@ interpret (ExprSet _ object name value) = do
     _ -> throwError $ InterpretRuntimeError name "Only instances have fields."
 
 instanceSet :: (MonadIO m) => Token -> LoxValue -> InstanceFields -> m ()
-instanceSet (view (lexeme . _Lexeme) -> name) v (InstanceFields fields) = do
+instanceSet (toName -> name) v (InstanceFields fields) = do
   liftIO $ H.insert fields name v
 
 instanceGet :: (MonadError InterpretError m, MonadIO m) => Token -> InstanceFields -> m LoxValue
 instanceGet name (InstanceFields fields) = do
-  let name' = view (lexeme . _Lexeme) name
+  let name' = toName name
   r <- liftIO $ H.lookup fields name'
   case r of
     Nothing -> throwError $ InterpretRuntimeError name [i|Undefined property '#{name'}'.|]
@@ -224,10 +220,10 @@ lookupVariable name eid = do
   case mDistance of
     Just distance -> do
       env <- use environment
-      Env.unsafeLookupAt distance env (view (lexeme . _Lexeme) name)
+      Env.unsafeLookupAt distance env (toName name)
     Nothing -> do
       env <- use environment
-      Env.unsafeGlobalGet env (view (lexeme . _Lexeme) name)
+      Env.unsafeGlobalGet env (toName name)
 
 call ::
   ( MonadIO m,

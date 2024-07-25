@@ -95,3 +95,35 @@ instance Pretty StmtFunctionLit where
 data ParseError = ParseError !Token !Text deriving (Show, Eq)
 
 instance Exception ParseError
+
+class HasName a where
+  toName :: a -> Text
+
+instance HasName Token where
+  toName (Token _ (Lexeme n) _ _) = n
+
+instance HasName Expr where
+  toName (ExprAssign _ t _) = toName t
+  toName (ExprBinary _ _ t _) = toName t
+  toName (ExprLogical _ _ t _) = toName t
+  toName (ExprCall _ _ t _) = toName t
+  toName (ExprGet _ _ t) = toName t
+  toName (ExprSet _ _ t _) = toName t
+  toName (ExprGrouping _ _) = ""
+  toName (ExprLiteral _ _) = ""
+  toName (ExprUnary _ t _) = toName t
+  toName (ExprVariable _ t) = toName t
+
+instance HasName Stmt where
+  toName (StmtExpr _ _) = ""
+  toName (StmtFunction _) = ""
+  toName (StmtIf {}) = ""
+  toName (StmtPrint _ _) = ""
+  toName (StmtReturn _ t _) = toName t
+  toName (StmtVar _ t _) = toName t
+  toName (StmtWhile {}) = ""
+  toName (StmtBlock _ _) = ""
+  toName (StmtClass _ t _) = toName t
+
+instance HasName StmtFunctionLit where
+  toName (StmtFunctionLit _ t _ _) = toName t
