@@ -59,7 +59,12 @@ data Stmt
   | StmtVar !UUID !Token !(Maybe Expr)
   | StmtWhile !UUID !Expr !Stmt
   | StmtBlock !UUID ![Stmt]
+  | StmtClass !UUID !Token ![Stmt]
   deriving (Show, Eq, Ord)
+
+data ClassMethod = ClassMethod !UUID !Token ![Token] ![Stmt] deriving (Show, Eq, Ord)
+instance Pretty ClassMethod where
+  pretty (ClassMethod _ name params body) = [i|(method #{pretty name} #{prettyList params} #{pretty body})|]
 
 instance Pretty [Stmt] where
   pretty stmts = [i|(sequence #{Text.intercalate " " (map pretty' stmts)})|]
@@ -72,6 +77,7 @@ instance Pretty [Stmt] where
       pretty' (StmtWhile _ cond body) = [i|(while #{pretty cond} #{pretty' body})|]
       pretty' (StmtFunction _ name params body) = [i|(declare-fun #{pretty name} #{prettyList params} #{pretty body})|]
       pretty' (StmtReturn _ keyword value) = [i|(#{pretty keyword} #{maybe "nil" pretty value})|]
+      pretty' (StmtClass _ name methods) = [i|(class #{pretty name} (methods #{Text.unwords $ map pretty' methods}))|]
 
 data ParseError = ParseError !Token !Text deriving (Show, Eq)
 

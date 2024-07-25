@@ -115,6 +115,18 @@ spec_simpleAst = do
         result <- fmap pretty <$> parse' "average(1, 2);"
         result `shouldBe` Right "(sequence (call average (list 1 2)))"
 
+      it "should parse classes" $ do
+        result <- fmap pretty <$> parse' [i|class DevonshireCream {
+                                              serveOn() {
+                                                return "Scones";
+                                              }
+                                            }
+
+                                            print DevonshireCream;
+                                           |]
+        result `shouldBe` Right "(sequence (class DevonshireCream (methods (declare-fun serveOn () (sequence (return Scones))))) (print DevonshireCream))"
+
+
 test_goldenParser :: TestTree
 test_goldenParser =
   testGroup

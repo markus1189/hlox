@@ -95,6 +95,12 @@ evalPure = traverse_ executePure
         Just v -> interpret v
         Nothing -> pure LoxNil
       throwError (InterpretReturn r)
+    executePure (StmtClass _ name _) = do
+      env <- use environment
+      let name' = name ^. lexeme . _Lexeme
+      Env.define env name' LoxNil
+      let klass = LoxClass name'
+      Env.assign env name name' klass
 
 runEffect :: LoxEffect -> IO ()
 runEffect (LoxEffectPrint t) = TIO.putStrLn t

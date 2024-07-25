@@ -57,6 +57,7 @@ resolve1 (StmtBlock _ stmts) = do
   beginScope
   resolveAll stmts
   endScope
+resolve1 (StmtClass _ name _) = declare name >> define name
 
 resolveFunction :: (HasCurrentFunction s FunctionType, HasDepthMap s DepthMap, HasScopeStack s ScopeStack, MonadWriter [ResolverError] m, MonadState s m) => [Token] -> [Stmt] -> m ()
 resolveFunction params body = do

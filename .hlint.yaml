@@ -17,3 +17,4 @@
 - group: {name: dollar, enabled: true}
 
 - ignore: {name: "Redundant $"}
+- ignore: {name: "Move brackets to avoid $"}

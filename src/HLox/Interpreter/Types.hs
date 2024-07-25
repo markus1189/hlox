@@ -24,6 +24,7 @@ data LoxValue
   | LoxBool !Bool
   | LoxFun ![Text] !Environment ![Stmt]
   | LoxNativeFun !LoxNativeFunKind
+  | LoxClass !Text
   deriving (Show, Eq, Ord)
 
 instance Pretty LoxValue where
@@ -37,6 +38,7 @@ stringify (LoxBool True) = "true"
 stringify (LoxBool False) = "false"
 stringify (LoxFun {}) = "<function>"
 stringify (LoxNativeFun k) = [i|<native function: #{show k}>|]
+stringify (LoxClass n) = [i|<class #{n}>|]
 
 data InterpretError
   = InterpretRuntimeError !Token !Text

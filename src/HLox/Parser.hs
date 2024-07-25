@@ -47,16 +47,24 @@ parseDeclarations = catMaybes <$> whileM (not <$> isAtEnd) parseDeclaration
 parseDeclaration :: StateT ParseState Lox (Maybe Stmt)
 parseDeclaration =
   ( Just
-      <$> ifM
+      <$> (ifM (match [CLASS]) parseClassDeclaration $
+      ifM
         (match [FUN])
         (parseFunction "function")
-        ( ifM
+        $ ifM
             (match [VAR])
             parseVarDeclaration
-            parseStatement
-        )
+            parseStatement)
   )
     `catch` \(ParseError _ _) -> Nothing <$ synchronize
+
+parseClassDeclaration :: StateT ParseState Lox Stmt
+parseClassDeclaration = do
+  name <- consume IDENTIFIER "Expect class name."
+  void $ consume LEFT_BRACE "Expect '{' before class body."
+  methods <- whileM ((&&) <$> (not <$> check RIGHT_BRACE) <*> (not <$> isAtEnd)) (parseFunction "method")
+  void $ consume RIGHT_BRACE "Expect '}' after class body."
+  StmtClass <$> freshId <*> pure name <*> pure methods
 
 parseFunction :: Text -> StateT ParseState Lox Stmt
 parseFunction kind = do
