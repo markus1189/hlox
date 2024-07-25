@@ -90,6 +90,8 @@ resolveExpr (ExprGrouping _ expr) = resolveExpr expr
 resolveExpr (ExprLiteral _ _) = pure ()
 resolveExpr (ExprLogical _ lhs _ rhs) = resolveExpr lhs *> resolveExpr rhs
 resolveExpr (ExprUnary _ _ expr) = resolveExpr expr
+resolveExpr (ExprGet _ expr _) = resolveExpr expr
+resolveExpr (ExprSet _ obj _ v) = resolveExpr v >> resolveExpr obj
 
 beginScope :: (HasScopeStack s ScopeStack, MonadState s m) => m ()
 beginScope = scopeStack . _ScopeStack %= (mempty :)

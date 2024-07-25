@@ -1,5 +1,6 @@
 module HLox.Interpreter (eval, evalPure, evalExpr) where
 
+import Data.HashTable.IO qualified as H
 import Control.Applicative ((<|>))
 import Control.Lens.Combinators (at, to, use, view)
 import Control.Lens.Operators
@@ -29,11 +30,14 @@ import Data.UUID (UUID)
 import HLox.Interpreter.Environment (assignAt, assignGlobal)
 import HLox.Interpreter.Environment qualified as Env
 import HLox.Interpreter.Types
-import HLox.Parser.Types (Expr (..), Stmt (..), exprId)
+import HLox.Parser.Types (Expr (..), Stmt (..))
 import HLox.Resolver.Types
 import HLox.Scanner.Types
 import HLox.Types (Lox)
 import HLox.Util (loxRuntimeError)
+import qualified Data.Map.Strict as Map
+import Data.Map.Strict (Map)
+import Data.Text (Text)
 
 eval :: (Traversable t) => DepthMap -> Environment -> t Stmt -> Lox ()
 eval dm env stmts = do
@@ -99,7 +103,7 @@ evalPure = traverse_ executePure
       env <- use environment
       let name' = name ^. lexeme . _Lexeme
       Env.define env name' LoxNil
-      let klass = LoxClass name'
+      let klass = LoxClass (Klass name')
       Env.assign env name name' klass
 
 runEffect :: LoxEffect -> IO ()
@@ -183,8 +187,32 @@ interpret (ExprCall _ callee paren arguments) = do
   checkArity paren (length args) callee'
   let function = callee'
   call paren function args
+interpret (ExprGet _ object name)   = do
+  obj <- interpret object
+  case obj of
+    LoxInstance _ fs -> instanceGet name fs
+    _ -> throwError $ InterpretRuntimeError name "Only instances have properties."
+interpret (ExprSet _ object name value) = do
+  obj <- interpret object
+  case obj of
+    LoxInstance _ fs -> do
+      v <- interpret value
+      instanceSet name v fs
+      pure v
+    _ -> throwError $ InterpretRuntimeError name "Only instances have fields."
 
--- lookupVariable :: (MonadState s m, HasDepthMap s DepthMap,) => Token -> Expr -> m LoxValue
+instanceSet :: (MonadIO m) => Token -> LoxValue -> InstanceFields -> m ()
+instanceSet (view (lexeme . _Lexeme) -> name) v (InstanceFields fields) = do
+  liftIO $ H.insert fields name v
+
+instanceGet :: (MonadError InterpretError m, MonadIO m) => Token -> InstanceFields -> m LoxValue
+instanceGet name (InstanceFields fields) = do
+  let name' = view (lexeme . _Lexeme) name
+  r <- liftIO $ H.lookup fields name'
+  case r of
+    Nothing -> throwError $ InterpretRuntimeError name [i|Undefined property '#{name'}'.|]
+    Just v -> pure v
+
 lookupVariable ::
   ( MonadIO m,
     HasDepthMap s DepthMap,
@@ -204,7 +232,18 @@ lookupVariable name eid = do
       env <- use environment
       Env.unsafeGlobalGet env (view (lexeme . _Lexeme) name)
 
-call :: (MonadIO m, MonadError InterpretError m, HasDepthMap s DepthMap, HasEnvironment s Environment, MonadState s m, MonadWriter [LoxEffect] m) => Token -> LoxValue -> [LoxValue] -> m LoxValue
+call ::
+  ( MonadIO m,
+    MonadError InterpretError m,
+    HasDepthMap s DepthMap,
+    HasEnvironment s Environment,
+    MonadState s m,
+    MonadWriter [LoxEffect] m
+  ) =>
+  Token ->
+  LoxValue ->
+  [LoxValue] ->
+  m LoxValue
 call _ (LoxFun params funEnv body) args = do
   callEnv <- Env.pushEmpty funEnv
   for_ (params `zip` args) $ uncurry (Env.define callEnv)
@@ -216,12 +255,14 @@ call _ (LoxFun params funEnv body) args = do
     Right _ -> pure Nothing
   environment .= oldEnv
   pure (fromMaybe LoxNil r')
+call _ (LoxClass k) _ = LoxInstance k <$> liftIO (InstanceFields <$> H.new)
 call _ (LoxNativeFun LoxClock) _ = LoxNumber . realToFrac <$> liftIO getPOSIXTime
 call paren _ _ = throwError (InterpretRuntimeError paren "Can only call functions and classes.")
 
 checkArity :: (MonadError InterpretError m) => Token -> Int -> LoxValue -> m ()
 checkArity paren a1 (LoxFun a2 _ _) = unless (a1 == length a2) $ throwError (InterpretRuntimeError paren [i|Expected #{length a2} arguments but got #{a1}.|])
 checkArity paren a1 (LoxNativeFun LoxClock) = unless (a1 == 0) $ throwError (InterpretRuntimeError paren [i|Expected 0 arguments but got #{a1}.|])
+checkArity paren a1 (LoxClass _) = unless (a1 == 0) $ throwError (InterpretRuntimeError paren [i|Expected 0 arguments but got #{a1}.|])
 checkArity _ _ _ = pure ()
 
 isTruthy :: LoxValue -> Bool

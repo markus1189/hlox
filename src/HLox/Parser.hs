@@ -26,8 +26,9 @@ import HLox.Types (Lox, MonadFreshId, freshId)
 import HLox.Util (loxReport)
 
 data ParseState where
-  ParseState :: {_psCurrent :: !Int, _psTokens :: !(Vector Token)} ->
-                  ParseState
+  ParseState ::
+    {_psCurrent :: !Int, _psTokens :: !(Vector Token)} ->
+    ParseState
   deriving (Show)
 
 makeLenses ''ParseState
@@ -47,14 +48,15 @@ parseDeclarations = catMaybes <$> whileM (not <$> isAtEnd) parseDeclaration
 parseDeclaration :: StateT ParseState Lox (Maybe Stmt)
 parseDeclaration =
   ( Just
-      <$> (ifM (match [CLASS]) parseClassDeclaration $
-      ifM
-        (match [FUN])
-        (parseFunction "function")
-        $ ifM
-            (match [VAR])
-            parseVarDeclaration
-            parseStatement)
+      <$> ( ifM (match [CLASS]) parseClassDeclaration
+              $ ifM
+                (match [FUN])
+                (parseFunction "function")
+              $ ifM
+                (match [VAR])
+                parseVarDeclaration
+                parseStatement
+          )
   )
     `catch` \(ParseError _ _) -> Nothing <$ synchronize
 
@@ -168,20 +170,19 @@ parseExpression = parseAssignment
 parseAssignment :: StateT ParseState Lox Expr
 parseAssignment = do
   expr <- parseOr
-
   ifM
-    (match [EQUAL])
-    ( do
-        equals <- previous
-        value <- parseAssignment
-
-        case expr of
-          ExprVariable _ name -> lift $ ExprAssign <$> freshId <*> pure name <*> pure value
-          _ -> do
-            lift $ void $ createError equals "Invalid assignment target."
-            pure expr
-    )
+    (not <$> match [EQUAL])
     (pure expr)
+    $ do
+      equals <- previous
+      value <- parseAssignment
+
+      case expr of
+        ExprVariable _ name -> lift $ ExprAssign <$> freshId <*> pure name <*> pure value
+        ExprGet _ obj name -> ExprSet <$> freshId <*> pure obj <*> pure name <*> pure value
+        _ -> do
+          lift $ void $ createError equals "Invalid assignment target."
+          pure expr
 
 parseOr :: StateT ParseState Lox Expr
 parseOr = parseBinary ExprLogical parseAnd [OR]
@@ -215,7 +216,16 @@ parseCall :: StateT ParseState Lox Expr
 parseCall = do
   expr <- parsePrimary
   res <- runExceptT $ flip iterateM_ expr $ \expr' -> do
-    ifM (match [LEFT_PAREN]) (lift $ finishCall expr') (throwError expr')
+    ifM
+      (match [LEFT_PAREN])
+      (lift $ finishCall expr')
+      $ ifM
+        (match [DOT])
+        ( lift $ do
+            name <- consume IDENTIFIER "Expect property name after '.'."
+            ExprGet <$> freshId <*> pure expr' <*> pure name
+        )
+      $ throwError expr'
   pure (fromEither res)
 
 finishCall :: Expr -> StateT ParseState Lox Expr

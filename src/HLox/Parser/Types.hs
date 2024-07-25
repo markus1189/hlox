@@ -16,6 +16,8 @@ data Expr
   | ExprBinary !UUID !Expr !Token !Expr
   | ExprLogical !UUID !Expr !Token !Expr
   | ExprCall !UUID !Expr !Token ![Expr]
+  | ExprGet !UUID !Expr !Token
+  | ExprSet !UUID !Expr !Token !Expr
   | ExprGrouping !UUID !Expr
   | ExprLiteral !UUID !Literal
   | ExprUnary !UUID !Token !Expr
@@ -27,6 +29,8 @@ exprId f (ExprAssign uid name value) = fmap (\uid' -> ExprAssign uid' name value
 exprId f (ExprBinary uid lhs op rhs) = fmap (\uid' -> ExprBinary uid' lhs op rhs) (f uid)
 exprId f (ExprLogical uid lhs op rhs) = fmap (\uid' -> ExprLogical uid' lhs op rhs) (f uid)
 exprId f (ExprCall uid callee paren arguments) = fmap (\uid' -> ExprCall uid' callee paren arguments) (f uid)
+exprId f (ExprGet uid object name) = fmap (\uid' -> ExprGet uid' object name) (f uid)
+exprId f (ExprSet uid object name value) = fmap (\uid' -> ExprSet uid' object name value) (f uid)
 exprId f (ExprGrouping uid e) = fmap (`ExprGrouping` e) (f uid)
 exprId f (ExprLiteral uid lit) = fmap (`ExprLiteral` lit) (f uid)
 exprId f (ExprUnary uid op e) = fmap (\uid' -> ExprUnary uid' op e) (f uid)
@@ -45,6 +49,8 @@ instance Pretty Expr where
   pretty (ExprVariable _ t) = pretty t
   pretty (ExprAssign _ name v) = [i|(reassign #{pretty name} #{pretty v})|]
   pretty (ExprCall _ callee _ arguments) = [i|(call #{pretty callee} #{prettyList arguments})|]
+  pretty (ExprGet _ object name) = [i|(get #{pretty object} #{pretty name})|]
+  pretty (ExprSet _ object name value) = [i|(set #{pretty object} #{pretty name} #{pretty value})|]
 
 prettyList :: (Pretty a) => [a] -> Text
 prettyList [] = "()"

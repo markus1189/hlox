@@ -24,8 +24,19 @@ data LoxValue
   | LoxBool !Bool
   | LoxFun ![Text] !Environment ![Stmt]
   | LoxNativeFun !LoxNativeFunKind
-  | LoxClass !Text
+  | LoxClass !Klass
+  | LoxInstance !Klass InstanceFields
   deriving (Show, Eq, Ord)
+
+data Klass = Klass !Text deriving (Show, Eq, Ord)
+
+newtype InstanceFields = InstanceFields (HashTable Text LoxValue)  deriving (Show)
+
+instance Eq InstanceFields where
+  _ == _ = False
+
+instance Ord InstanceFields where
+  compare _ _ = EQ
 
 instance Pretty LoxValue where
   pretty = stringify
@@ -38,7 +49,8 @@ stringify (LoxBool True) = "true"
 stringify (LoxBool False) = "false"
 stringify (LoxFun {}) = "<function>"
 stringify (LoxNativeFun k) = [i|<native function: #{show k}>|]
-stringify (LoxClass n) = [i|<class #{n}>|]
+stringify (LoxClass (Klass n)) = [i|<class #{n}>|]
+stringify (LoxInstance (Klass n) (InstanceFields fields)) = [i|<instance #{n} #{fields}>|]
 
 data InterpretError
   = InterpretRuntimeError !Token !Text
@@ -62,3 +74,4 @@ data InterpreterState = InterpreterState
   }
 
 makeFields ''InterpreterState
+makePrisms ''InstanceFields

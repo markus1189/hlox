@@ -225,6 +225,21 @@ spec_interpreterPrograms = do
             LoxEffectPrint "global"
           ]
 
+    it "should allow calling classes to create instances" $ do
+      let program = "class Bagel {} var bagel = Bagel(); print bagel;"
+      result <- interpretStmt' program
+      result `shouldBe` Right [LoxEffectPrint "<instance Bagel <HashTable>>"]
+
+    it "should support get and set on instances" $ do
+      let program = [i|class Donut {}
+
+                       var donut = Donut();
+                       donut.topping = "Chocolate";
+                       print donut.topping;
+                      |]
+      result <- interpretStmt' program
+      result `shouldBe` Right [LoxEffectPrint "Chocolate"]
+
 evalExpr' :: Text -> IO (Either InterpretError LoxValue)
 evalExpr' input = do
   loxEnv <- makeLoxEnv
