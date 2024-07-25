@@ -24,6 +24,7 @@ import HLox.Pretty (Pretty, pretty)
 import HLox.Scanner.Types
 import HLox.Types (Lox, MonadFreshId, freshId)
 import HLox.Util (loxReport)
+import qualified Data.Map.Strict as Map
 
 data ParseState where
   ParseState ::
@@ -66,7 +67,7 @@ parseClassDeclaration = do
   void $ consume LEFT_BRACE "Expect '{' before class body."
   methods <- whileM ((&&) <$> (not <$> check RIGHT_BRACE) <*> (not <$> isAtEnd)) (parseFunction "method")
   void $ consume RIGHT_BRACE "Expect '}' after class body."
-  StmtClass <$> freshId <*> pure name <*> pure methods
+  StmtClass <$> freshId <*> pure name <*> pure (Map.fromList $ fmap (\f@(StmtFunctionLit _ n _ _) -> (view (lexeme . _Lexeme) n, f)) methods)
 
 parseFunction :: Text -> StateT ParseState Lox StmtFunctionLit
 parseFunction kind = do

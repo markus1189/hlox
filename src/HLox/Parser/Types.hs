@@ -10,6 +10,8 @@ import Formatting (build, sformat)
 import Formatting.Formatters (shortest)
 import HLox.Pretty (Pretty, pretty)
 import HLox.Scanner.Types
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 
 data Expr
   = ExprAssign !UUID !Token !Expr
@@ -65,7 +67,7 @@ data Stmt
   | StmtVar !UUID !Token !(Maybe Expr)
   | StmtWhile !UUID !Expr !Stmt
   | StmtBlock !UUID ![Stmt]
-  | StmtClass !UUID !Token ![StmtFunctionLit]
+  | StmtClass !UUID !Token !(Map Text StmtFunctionLit)
   deriving (Show, Eq, Ord)
 
 data StmtFunctionLit = StmtFunctionLit !UUID !Token ![Token] ![Stmt] deriving (Show, Eq, Ord)
@@ -85,7 +87,7 @@ instance Pretty [Stmt] where
       pretty' (StmtWhile _ cond body) = [i|(while #{pretty cond} #{pretty' body})|]
       pretty' (StmtFunction lit) = pretty lit
       pretty' (StmtReturn _ keyword value) = [i|(#{pretty keyword} #{maybe "nil" pretty value})|]
-      pretty' (StmtClass _ name methods) = [i|(class #{pretty name} (methods #{Text.unwords $ map pretty methods}))|]
+      pretty' (StmtClass _ name methods) = [i|(class #{pretty name} (methods #{Text.unwords $ map pretty $ Map.elems methods}))|]
 
 instance Pretty StmtFunctionLit where
   pretty (StmtFunctionLit _ name params body) = [i|(declare-fun #{pretty name} #{prettyList params} #{pretty body})|]
