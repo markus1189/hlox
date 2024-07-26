@@ -21,7 +21,11 @@ data FunctionType
   | FunctionTypeIntializer
   deriving (Show, Eq, Ord)
 
-data ClassType = ClassTypeNone | ClassTypeClass deriving (Show, Eq, Ord)
+data ClassType
+  = ClassTypeNone
+  | ClassTypeClass
+  | ClassTypeSubclass
+  deriving (Show, Eq, Ord)
 
 data ResolverState = ResolverState
   { resolverStateScopeStack :: !ScopeStack,

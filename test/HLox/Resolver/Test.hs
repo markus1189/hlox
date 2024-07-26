@@ -34,6 +34,12 @@ spec_simpleAst = do
     it "should disallow self inheritance" $ do
       result <- resolve' [i|class Foo < Foo {}|]
       result `shouldBe` (DepthMap mempty, [ResolverError (Token IDENTIFIER (Lexeme "Foo") LitNothing (Line 1)) "A class can't inherit from itself."])
+    it "should disallow super without a superclass" $ do
+      result <- resolve' [i|class Eclair { cook() { super.cook(); } }|]
+      result `shouldBe` (DepthMap mempty, [ResolverError (Token SUPER (Lexeme "super") LitNothing (Line 1)) "Can't use 'super' in a class with no superclass."])
+    it "should disallow super on top-level" $ do
+      result <- resolve' [i|super.notEvenInAClass();|]
+      result `shouldBe` (DepthMap mempty, [ResolverError (Token SUPER (Lexeme "super") LitNothing (Line 1)) "Can't use 'super' outside of a class."])
 
 resolve' :: Text -> IO (DepthMap, [ResolverError])
 resolve' input = do

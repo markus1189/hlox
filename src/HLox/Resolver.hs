@@ -69,6 +69,7 @@ resolve1 (StmtClass _ name methods mSuperclass) = do
 
   for_ mSuperclass $ \superclass@(ExprVar _ t) -> do
     when (toName name == toName superclass) $ tell . pure $ ResolverError t "A class can't inherit from itself."
+    classType .= ClassTypeSubclass
     resolveExpr (ExprVariable superclass)
 
   for_ mSuperclass $ const $ do
@@ -138,7 +139,13 @@ resolveExpr (ExprSet _ obj _ v) = resolveExpr v >> resolveExpr obj
 resolveExpr expr@(ExprThis _ t) = do
   whenM ((== ClassTypeNone) <$> use classType) $ tell . pure $ ResolverError t "Can't use 'this' outside of a class."
   resolveLocal expr t
-resolveExpr expr@(ExprSuper _ kw _) = resolveLocal expr kw
+resolveExpr expr@(ExprSuper _ kw _) = do
+  ct <- use classType
+  case ct of
+    ClassTypeNone -> tell . pure $ ResolverError kw "Can't use 'super' outside of a class."
+    ClassTypeClass -> tell . pure $ ResolverError kw "Can't use 'super' in a class with no superclass."
+    ClassTypeSubclass -> pure ()
+  resolveLocal expr kw
 
 beginScope :: (HasScopeStack s ScopeStack, MonadState s m) => m ()
 beginScope = scopeStack . _ScopeStack %= (mempty :)
